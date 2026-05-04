@@ -1,0 +1,12 @@
+node_modules/
+dist/
+dist-electron/
+release/
+release.zip
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.DS_Store
+Thumbs.db

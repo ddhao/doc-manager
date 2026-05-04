@@ -1,0 +1,22 @@
+/// <reference types="vite/client" />
+
+interface Window {
+  electronAPI: {
+    db: {
+      run: (sql: string, params?: any[]) => Promise<{ changes: number; lastInsertRowId: number | bigint }>;
+      all: (sql: string, params?: any[]) => Promise<any[]>;
+      get: (sql: string, params?: any[]) => Promise<any>;
+      export: () => Promise<{ success: boolean; path?: string }>;
+      import: () => Promise<{ success: boolean; error?: string }>;
+    };
+    clipboard: {
+      writeText: (text: string) => Promise<void>;
+    };
+    print: {
+      printPDF: (content: string) => Promise<void>;
+    };
+    file: {
+      saveFile: (data: ArrayBuffer) => Promise<string | null>;
+    };
+  };
+}
