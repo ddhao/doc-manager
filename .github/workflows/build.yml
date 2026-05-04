@@ -12,11 +12,11 @@ jobs:
       matrix:
         include:
           - os: macos-latest
+            platform: mac
             arch: x64
-            target: dmg
           - os: windows-latest
+            platform: win
             arch: x64
-            target: nsis
 
     runs-on: ${{ matrix.os }}
 
@@ -34,7 +34,7 @@ jobs:
         run: npx electron-rebuild -f -w better-sqlite3
 
       - name: Build & package
-        run: npx electron-builder --${{ matrix.target }} --${{ matrix.arch }}
+        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
