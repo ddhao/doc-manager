@@ -34,7 +34,7 @@ jobs:
         run: npx electron-rebuild -f -w better-sqlite3
 
       - name: Build & package
-        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }}
+        run: npm run electron:build -- --${{ matrix.platform }} --${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
