@@ -13,6 +13,7 @@ import {
   SettingOutlined,
   FolderOpenOutlined,
   CloudServerOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 
 const { Sider, Content, Header } = Layout;
@@ -29,6 +30,7 @@ const pageTitles: Record<string, string> = {
   '/archives/records': '归档记录',
   '/config': '基本配置',
   '/backup': '备份管理',
+  '/templates': '模版管理',
 };
 
 const menuItems: MenuProps['items'] = [
@@ -45,6 +47,8 @@ const menuItems: MenuProps['items'] = [
   { key: '/archives', icon: <FolderOpenOutlined />, label: '档案管理' },
   { key: '/config', icon: <SettingOutlined />, label: '基本配置' },
   { key: '/backup', icon: <CloudServerOutlined />, label: '备份管理' },
+  { type: 'divider' },
+  { key: '/templates', icon: <FileTextOutlined />, label: '模版管理' },
 ];
 
 export default function AppLayout() {

@@ -11,6 +11,7 @@ import ConfigPage from './pages/config/ConfigPage';
 import ArchivesPage from './pages/archives/ArchivesPage';
 import ArchiveRecordsPage from './pages/archives/ArchiveRecordsPage';
 import BackupPage from './pages/backup/BackupPage';
+import TemplatePage from './pages/templates/TemplatePage';
 
 export default function Router() {
   return (
@@ -28,6 +29,7 @@ export default function Router() {
         <Route path="/archives" element={<ArchivesPage />} />
         <Route path="/archives/records" element={<ArchiveRecordsPage />} />
         <Route path="/backup" element={<BackupPage />} />
+        <Route path="/templates" element={<TemplatePage />} />
       </Route>
     </Routes>
   );

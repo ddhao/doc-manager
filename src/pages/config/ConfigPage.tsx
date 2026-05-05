@@ -73,7 +73,7 @@ function LevelConfig() {
           添加
         </Button>
       </Space>
-      <Table rowKey="id" columns={columns} dataSource={levels} size="small" />
+      <Table rowKey="id" columns={columns} dataSource={levels} size="small" scroll={{ y: 'calc(100vh - 250px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
     </div>
   );
 }
@@ -120,7 +120,7 @@ function DocTypeConfig() {
           添加
         </Button>
       </Space>
-      <Table rowKey="id" columns={columns} dataSource={docTypes} size="small" />
+      <Table rowKey="id" columns={columns} dataSource={docTypes} size="small" scroll={{ y: 'calc(100vh - 250px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
     </div>
   );
 }
@@ -167,7 +167,7 @@ function TagConfig() {
           添加
         </Button>
       </Space>
-      <Table rowKey="id" columns={columns} dataSource={tags} size="small" />
+      <Table rowKey="id" columns={columns} dataSource={tags} size="small" scroll={{ y: 'calc(100vh - 250px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
     </div>
   );
 }
@@ -214,7 +214,7 @@ function DispatchTypeConfig() {
           添加
         </Button>
       </Space>
-      <Table rowKey="id" columns={columns} dataSource={dispatchTypes} size="small" />
+      <Table rowKey="id" columns={columns} dataSource={dispatchTypes} size="small" scroll={{ y: 'calc(100vh - 250px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
     </div>
   );
 }

@@ -85,7 +85,8 @@ export default function ArchivesPage() {
           columns={boxColumns}
           dataSource={store.boxes}
           size="small"
-          pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 个文件盒` }}
+          scroll={{ y: 'calc(100vh - 260px)' }}
+          pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 个文件盒` }}
         />
       </Card>
 

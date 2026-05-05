@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, clipboard, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, clipboard, dialog, shell } from 'electron';
 import { join } from 'path';
-import { writeFile } from 'fs/promises';
+import { writeFile, readFile } from 'fs/promises';
 import './ipc/db';
 
 let mainWindow: BrowserWindow | null = null;
@@ -56,13 +56,39 @@ ipcMain.handle('print:pdf', async (_event, _content: string) => {
   return null;
 });
 
-ipcMain.handle('file:save', async (_event, data: ArrayBuffer) => {
+ipcMain.handle('file:openFile', async (_event, options?: { filters?: { name: string; extensions: string[] }[] }) => {
+  const result = await dialog.showOpenDialog({
+    filters: options?.filters || [{ name: 'Word Documents', extensions: ['docx'] }],
+    properties: ['openFile'],
+  });
+  if (!result.canceled && result.filePaths.length > 0) {
+    const data = await readFile(result.filePaths[0]);
+    return { filePath: result.filePaths[0], data: data.buffer };
+  }
+  return null;
+});
+
+ipcMain.handle('file:save', async (_event, data: ArrayBuffer, options?: { defaultName?: string; filters?: { name: string; extensions: string[] }[] }) => {
   const result = await dialog.showSaveDialog({
-    filters: [{ name: 'All Files', extensions: ['*'] }],
+    defaultPath: options?.defaultName,
+    filters: options?.filters || [{ name: 'All Files', extensions: ['*'] }],
   });
   if (!result.canceled && result.filePath) {
     await writeFile(result.filePath, Buffer.from(data));
     return result.filePath;
   }
   return null;
+});
+
+ipcMain.handle('file:saveTemp', async (_event, data: ArrayBuffer, filename: string) => {
+  const { writeFile: wf } = await import('fs/promises');
+  const { join: jn } = await import('path');
+  const { tmpdir } = await import('os');
+  const tmpPath = jn(tmpdir(), filename);
+  await wf(tmpPath, Buffer.from(data));
+  return tmpPath;
+});
+
+ipcMain.handle('shell:openPath', async (_event, filePath: string) => {
+  return shell.openPath(filePath);
 });

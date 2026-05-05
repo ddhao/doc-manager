@@ -16,7 +16,12 @@ interface Window {
       printPDF: (content: string) => Promise<void>;
     };
     file: {
-      saveFile: (data: ArrayBuffer) => Promise<string | null>;
+      openFile: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePath: string; data: ArrayBuffer } | null>;
+      saveFile: (data: ArrayBuffer, options?: { defaultName?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
+      saveTemp: (data: ArrayBuffer, filename: string) => Promise<string>;
+    };
+    shell: {
+      openPath: (filePath: string) => Promise<string>;
     };
   };
 }

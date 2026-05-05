@@ -212,7 +212,6 @@ export default function DashboardPage() {
   ];
 
   const meetingColumns: ColumnsType<Meeting> = [
-    { title: 'ID', dataIndex: 'id', width: 50 },
     { title: '会议主题', dataIndex: 'subject', ellipsis: true },
     {
       title: '会议时间',
@@ -238,6 +237,12 @@ export default function DashboardPage() {
           </Space>
         );
       },
+    },
+    {
+      title: '参会领导',
+      dataIndex: 'leaders',
+      width: 140,
+      render: (v) => v || <span style={{ color: '#ccc' }}>-</span>,
     },
     { title: '创建时间', dataIndex: 'created_at', width: 160 },
   ];
@@ -336,8 +341,8 @@ export default function DashboardPage() {
           </Select>
         }
       >
-        <Table rowKey="id" columns={incomingColumns} dataSource={filteredDocs} size="small" scroll={{ x: 900 }}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+        <Table rowKey="id" columns={incomingColumns} dataSource={filteredDocs} size="small" scroll={{ x: 900, y: 'calc(100vh - 380px)' }}
+          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
           onRow={(record) => ({ style: { ...getRowStyle(record), transition: 'background 0.3s' } })}
         />
       </Card>
@@ -364,8 +369,8 @@ export default function DashboardPage() {
         </Col>
       </Row>
       <Card size="small" title="需要关注的发文">
-        <Table rowKey="id" columns={outgoingColumns} dataSource={needReplyOutgoing} size="small" scroll={{ x: 800 }}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+        <Table rowKey="id" columns={outgoingColumns} dataSource={needReplyOutgoing} size="small" scroll={{ x: 800, y: 'calc(100vh - 380px)' }}
+          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
           onRow={(record) => ({ style: { ...getRowStyle(record), transition: 'background 0.3s' } })}
         />
       </Card>
@@ -395,8 +400,8 @@ export default function DashboardPage() {
         size="small"
         title={meetingFilter === 'today' ? '今日会议' : meetingFilter === 'week' ? '近7日会议（不含今天）' : '即将召开的会议'}
       >
-        <Table rowKey="id" columns={meetingColumns} dataSource={filteredMeetings} size="small" scroll={{ x: 800 }}
-          pagination={{ pageSize: 10, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+        <Table rowKey="id" columns={meetingColumns} dataSource={filteredMeetings} size="small" scroll={{ x: 800, y: 'calc(100vh - 380px)' }}
+          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
         />
       </Card>
     </div>

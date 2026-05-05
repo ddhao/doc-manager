@@ -15,6 +15,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     printPDF: (content: string) => ipcRenderer.invoke('print:pdf', content),
   },
   file: {
-    saveFile: (data: ArrayBuffer) => ipcRenderer.invoke('file:save', data),
+    openFile: (options?: { filters?: { name: string; extensions: string[] }[] }) =>
+      ipcRenderer.invoke('file:openFile', options),
+    saveFile: (data: ArrayBuffer, options?: { defaultName?: string; filters?: { name: string; extensions: string[] }[] }) =>
+      ipcRenderer.invoke('file:save', data, options),
+    saveTemp: (data: ArrayBuffer, filename: string) => ipcRenderer.invoke('file:saveTemp', data, filename),
+  },
+  shell: {
+    openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath),
   },
 });

@@ -252,8 +252,8 @@ export default function OutgoingPage() {
         columns={columns}
         dataSource={docs}
         size="small"
-        scroll={{ x: 900 }}
-        pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+        scroll={{ x: 900, y: 'calc(100vh - 230px)' }}
+        pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
         onRow={(record) => ({ style: getUrgencyStyle(record.reply_deadline) })}
       />
 

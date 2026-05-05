@@ -137,6 +137,7 @@ function initTables(db: Database.Database) {
       location TEXT,
       notification_template TEXT,
       notes TEXT,
+      leaders TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -227,6 +228,41 @@ function initTables(db: Database.Database) {
     db.exec(`ALTER TABLE meetings ADD COLUMN notes TEXT`);
   } catch { /* column already exists */ }
 
+  // Migration: add leaders column to meetings
+  try {
+    db.exec(`ALTER TABLE meetings ADD COLUMN leaders TEXT`);
+  } catch { /* column already exists */ }
+
+  // Migration: add meeting_time_end column to meetings
+  try {
+    db.exec(`ALTER TABLE meetings ADD COLUMN meeting_time_end TEXT`);
+  } catch { /* column already exists */ }
+
+  // Migration: add reply_date column to incoming_docs
+  try {
+    db.exec(`ALTER TABLE incoming_docs ADD COLUMN reply_date TEXT`);
+  } catch { /* column already exists */ }
+
+  // Migration: add notes column to incoming_docs
+  try {
+    db.exec(`ALTER TABLE incoming_docs ADD COLUMN notes TEXT`);
+  } catch { /* column already exists */ }
+
+  // One-time: clear all meeting data for schema upgrade
+  const meetingCleared = db.prepare(
+    "SELECT value FROM config WHERE key = 'meeting_data_cleared_v2'"
+  ).get() as { value: string } | undefined;
+  if (!meetingCleared) {
+    db.exec(`
+      DELETE FROM meeting_files;
+      DELETE FROM meeting_attendees;
+      DELETE FROM meetings;
+    `);
+    db.prepare(
+      "INSERT OR REPLACE INTO config (key, value) VALUES ('meeting_data_cleared_v2', '1')"
+    ).run();
+  }
+
   // Migration: add alias column to contacts
   try {
     db.exec(`ALTER TABLE contacts ADD COLUMN alias TEXT`);
@@ -272,6 +308,12 @@ function initTables(db: Database.Database) {
       ALTER TABLE _idd_new RENAME TO incoming_doc_departments;
     `);
   }
+
+  // Migration: add columns for approval form fields
+  try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN document_number TEXT`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN security_level TEXT`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN handler TEXT`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN reviewer TEXT`); } catch { /* exists */ }
 
   seedDefaults(db);
 }

@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, Select, DatePicker, Popconfirm,
-  Upload, message, Card, Typography, Row, Col, Transfer, Divider,
+  Upload, message, Card, Typography, Row, Col, Transfer, Divider, Tag, Dropdown,
 } from 'antd';
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, FileTextOutlined,
-  NotificationOutlined, CopyOutlined,
+  NotificationOutlined, CopyOutlined, ImportOutlined, ExportOutlined, MoreOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -19,6 +19,7 @@ const defaultTemplate = `会议通知
 时间：{{时间}}
 地点：{{地点}}
 备注：{{备注}}
+参会领导：{{参会领导}}
 参会人员：{{参会人员}}
 
 请各位参会人员准时参加。`;
@@ -29,9 +30,10 @@ function fillTemplate(template: string, data: Record<string, string>): string {
 
 const WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
 
-function formatMeetingTime(dt: string | null): string {
+function formatMeetingTime(dt: string | null, endDt?: string | null): string {
   if (!dt) return '';
   const d = dayjs(dt);
+  if (!d.isValid()) return dt + (endDt ? ` ~ ${endDt}` : '');
   const today = dayjs().startOf('day');
   const diffDays = d.startOf('day').diff(today, 'day');
 
@@ -60,7 +62,31 @@ function formatMeetingTime(dt: string | null): string {
   else if (hour >= 12 && hour <= 13) period = '中午';
   else if (hour >= 14 && hour <= 17) period = '下午';
   else if (hour >= 18) period = '晚上';
-  return `${datePart}${period}${d.format('HH:mm')}`;
+
+  const startStr = `${datePart}${period}${d.format('HH:mm')}`;
+
+  if (endDt) {
+    const e = dayjs(endDt);
+    if (!e.isValid()) return `${startStr} ~ ${endDt}`;
+    const endHour = e.hour();
+    let endPeriod = '早上';
+    if (endHour >= 0 && endHour <= 5) endPeriod = '凌晨';
+    else if (endHour >= 6 && endHour <= 8) endPeriod = '早上';
+    else if (endHour >= 9 && endHour <= 11) endPeriod = '上午';
+    else if (endHour >= 12 && endHour <= 13) endPeriod = '中午';
+    else if (endHour >= 14 && endHour <= 17) endPeriod = '下午';
+    else if (endHour >= 18) endPeriod = '晚上';
+
+    // Same day, only show time for end
+    if (d.format('YYYY-MM-DD') === e.format('YYYY-MM-DD')) {
+      return `${startStr} ~ ${endPeriod}${e.format('HH:mm')}`;
+    }
+    // Different day - show full date for end
+    const endDateStr = e.format('M月D日');
+    return `${startStr} ~ ${endDateStr}${endPeriod}${e.format('HH:mm')}`;
+  }
+
+  return startStr;
 }
 
 export default function MeetingsPage() {
@@ -78,16 +104,23 @@ export default function MeetingsPage() {
   const [receiptText, setReceiptText] = useState('');
   const [keyword, setKeyword] = useState('');
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number>(dayjs().year());
+  const [pageSize, setPageSize] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [clearPwdOpen, setClearPwdOpen] = useState(false);
+  const [clearPwd, setClearPwd] = useState('');
   const [form] = Form.useForm();
 
   useEffect(() => {
     store.loadMeetings(
       keyword || undefined,
-      dateRange ? [dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')] : undefined
+      dateRange ? [dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')] : undefined,
+      selectedYear
     );
     loadContacts();
     loadTemplate();
-  }, [keyword, dateRange]);
+    setCurrentPage(1);
+  }, [keyword, dateRange, selectedYear]);
 
   const loadTemplate = async () => {
     const row = await db.get<{ value: string }>(
@@ -104,14 +137,103 @@ export default function MeetingsPage() {
     message.success('通知模版已保存');
   };
 
+  // Slice data for current page, then compute rowSpan within that page only
+  const { pagedMeetings, dateRowSpanMap } = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const slice = store.meetings.slice(start, start + pageSize);
+
+    const counts = new Map<string, number>();
+    for (const m of slice) {
+      let dk: string;
+      if (!m.meeting_time) { dk = `_none_${m.id}`; }
+      else { const d = dayjs(m.meeting_time); dk = d.isValid() ? d.format('YYYY-MM-DD') : m.meeting_time!; }
+      counts.set(dk, (counts.get(dk) || 0) + 1);
+    }
+    const seen = new Set<string>();
+    const map = new Map<number, number>();
+    for (const m of slice) {
+      let dk: string;
+      if (!m.meeting_time) { dk = `_none_${m.id}`; }
+      else { const d = dayjs(m.meeting_time); dk = d.isValid() ? d.format('YYYY-MM-DD') : m.meeting_time!; }
+      const span = counts.get(dk) || 1;
+      if (seen.has(dk)) { map.set(m.id, 0); } else { seen.add(dk); map.set(m.id, span); }
+    }
+    return { pagedMeetings: slice, dateRowSpanMap: map };
+  }, [store.meetings, currentPage, pageSize]);
+
   const columns: ColumnsType<Meeting> = [
-    { title: 'ID', dataIndex: 'id', width: 50 },
-    { title: '会议主题', dataIndex: 'subject', ellipsis: true },
     {
-      title: '会议时间',
+      title: '日期',
       dataIndex: 'meeting_time',
-      width: 160,
-      render: (v) => (v ? dayjs(v).format('YYYY-MM-DD HH:mm') : '-'),
+      width: 100,
+      onCell: (record) => ({
+        rowSpan: dateRowSpanMap.get(record.id) ?? 1,
+      }),
+      render: (v) => {
+        if (!v) return '-';
+        const d = dayjs(v);
+        if (d.isValid()) return d.format('M月D日');
+        // Try to extract date part from "YYYY-MM-DD ..." style raw text
+        const m = v.match(/^(\d{4}-\d{1,2}-\d{1,2})/);
+        if (m) {
+          const dd = dayjs(m[1]);
+          if (dd.isValid()) return dd.format('M月D日');
+        }
+        return v;
+      },
+    },
+    {
+      title: '时间',
+      dataIndex: 'meeting_time',
+      width: 130,
+      render: (v, record) => {
+        if (!v) return '-';
+        const d = dayjs(v);
+        if (d.isValid()) {
+          let text = d.format('HH:mm');
+          if (record.meeting_time_end) {
+            const e = dayjs(record.meeting_time_end);
+            if (e.isValid()) {
+              if (d.format('YYYY-MM-DD') === e.format('YYYY-MM-DD')) {
+                text += ` ~ ${e.format('HH:mm')}`;
+              } else {
+                text += ` ~ ${e.format('M月D日 HH:mm')}`;
+              }
+            } else {
+              text += ` ~ ${record.meeting_time_end}`;
+            }
+          }
+          return text;
+        }
+        // Try to extract time part from "YYYY-MM-DD HH:MM" or "... HH:MM ..." style raw text
+        const tm = v.match(/(\d{1,2}:\d{2})/);
+        if (tm) {
+          let text = tm[1];
+          if (record.meeting_time_end) {
+            const em = record.meeting_time_end.match(/(\d{1,2}:\d{2})/);
+            if (em) text += ` ~ ${em[1]}`;
+          }
+          return text;
+        }
+        return v;
+      },
+    },
+    {
+      title: '会议主题',
+      dataIndex: 'subject',
+      render: (v) => (
+        <div
+          style={{
+            whiteSpace: 'pre-wrap',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {v || '-'}
+        </div>
+      ),
     },
     {
       title: '会议地点',
@@ -154,24 +276,37 @@ export default function MeetingsPage() {
         </div>
       ),
     },
-    { title: '创建时间', dataIndex: 'created_at', width: 160 },
+    {
+      title: '参会领导',
+      dataIndex: 'leaders',
+      width: 140,
+      render: (v) => v || <span style={{ color: '#ccc' }}>-</span>,
+    },
     {
       title: '操作',
-      width: 240,
+      width: 200,
       render: (_, record) => (
         <Space size="small" wrap>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
             编辑
           </Button>
-          <Button size="small" icon={<FileTextOutlined />} onClick={() => openFiles(record.id)}>
-            文件
-          </Button>
           <Button size="small" icon={<NotificationOutlined />} onClick={() => openNotify(record)}>
             通知
           </Button>
-          <Popconfirm title="确定删除？" onConfirm={() => { store.removeMeeting(record.id); message.success('已删除'); }}>
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          <Dropdown
+            menu={{
+              items: [
+                { key: 'files', label: '文件', icon: <FileTextOutlined />, onClick: () => openFiles(record.id) },
+                { type: 'divider' as const },
+                {
+                  key: 'delete', label: '删除', danger: true, icon: <DeleteOutlined />,
+                  onClick: () => { store.removeMeeting(record.id); message.success('已删除'); },
+                },
+              ],
+            }}
+          >
+            <Button size="small" icon={<MoreOutlined />} />
+          </Dropdown>
         </Space>
       ),
     },
@@ -183,6 +318,7 @@ export default function MeetingsPage() {
       form.setFieldsValue({
         ...record,
         meeting_time: record.meeting_time ? dayjs(record.meeting_time) : null,
+        meeting_time_end: record.meeting_time_end ? dayjs(record.meeting_time_end) : null,
       });
       loadAttendeeKeys(record.id);
     } else {
@@ -210,16 +346,23 @@ export default function MeetingsPage() {
       const attendeeNames = store.attendees.map((a: any) => `@${a.contact_name}`).join(' ');
       const text = fillTemplate(tmpl, {
         '主题': record.subject,
-        '时间': formatMeetingTime(record.meeting_time),
+        '时间': formatMeetingTime(record.meeting_time, record.meeting_time_end),
         '地点': record.location || '',
         '备注': record.notes || '',
+        '参会领导': record.leaders || '',
         '参会人员': attendeeNames,
       });
       setNotifyText(text);
-      const receipt = `参会回执：${record.subject}\n${'='.repeat(30)}\n` + store.attendees
-        .map((a: any) => `${a.contact_name} ${a.contact_title || ''} ${a.contact_phone || ''}`.trim())
-        .join('\n');
-      setReceiptText(receipt || '暂无参会人员');
+      const receiptParts = [`参会回执：${record.subject}`, '='.repeat(30)];
+      if (record.leaders) {
+        receiptParts.push(`【参会领导】${record.leaders}`);
+      }
+      receiptParts.push(
+        store.attendees
+          .map((a: any) => `${a.contact_name} ${a.contact_title || ''} ${a.contact_phone || ''}`.trim())
+          .join('\n')
+      );
+      setReceiptText(receiptParts.join('\n') || '暂无参会人员');
     });
     setNotifyVisible(true);
   };
@@ -235,6 +378,7 @@ export default function MeetingsPage() {
     const data = {
       ...values,
       meeting_time: values.meeting_time ? values.meeting_time.format('YYYY-MM-DD HH:mm') : null,
+      meeting_time_end: values.meeting_time_end ? values.meeting_time_end.format('YYYY-MM-DD HH:mm') : null,
     };
     let meetingId: number;
     if (editing) {
@@ -280,42 +424,84 @@ export default function MeetingsPage() {
     const attendeeNames = store.attendees.map((a: any) => `@${a.contact_name}`).join(' ');
     const text = fillTemplate(template, {
       '主题': meeting.subject,
-      '时间': formatMeetingTime(meeting.meeting_time),
+      '时间': formatMeetingTime(meeting.meeting_time, meeting.meeting_time_end),
       '地点': meeting.location || '',
       '备注': meeting.notes || '',
+      '参会领导': meeting.leaders || '',
       '参会人员': attendeeNames,
     });
     setNotifyText(text);
   };
 
-  return (
-    <div>
-      <Button
-        type="primary"
-        icon={<PlusOutlined />}
-        style={{ marginBottom: 16 }}
-        onClick={() => openEdit()}
-      >
-        新建会议
-      </Button>
-      <Input.Search
-        placeholder="搜索会议主题"
-        allowClear
-        style={{ width: 200, marginLeft: 8 }}
-        value={keyword}
-        onChange={(e) => setKeyword(e.target.value)}
-        onSearch={(v) => setKeyword(v)}
-      />
-      <DatePicker.RangePicker
-        value={dateRange}
-        onChange={(v) => setDateRange(v as [dayjs.Dayjs, dayjs.Dayjs] | null)}
-        placeholder={['创建开始', '创建结束']}
-        style={{ marginLeft: 8 }}
-      />
+  const handleImport = async () => {
+    const result = await window.electronAPI.file.openFile({
+      filters: [{ name: 'Excel文件', extensions: ['xlsx', 'xls'] }],
+    });
+    if (!result) return;
+    try {
+      const { imported, skipped } = await store.importFromExcel(result.data, selectedYear);
+      message.success(`导入完成：成功 ${imported} 条${skipped > 0 ? `，跳过 ${skipped} 条` : ''}`);
+    } catch (e: any) {
+      message.error(`导入失败：${e.message || '请检查文件格式'}`);
+    }
+  };
 
-      <Table rowKey="id" columns={columns} dataSource={store.meetings} size="small"
-        pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条` }}
-      />
+  const handleExport = async () => {
+    try {
+      const data = await store.exportToExcel(selectedYear);
+      await window.electronAPI.file.saveFile(data, {
+        defaultName: `${selectedYear}年会议安排表.xlsx`,
+        filters: [{ name: 'Excel文件', extensions: ['xlsx'] }],
+      });
+      message.success('导出成功');
+    } catch (e: any) {
+      message.error(`导出失败：${e.message || '未知错误'}`);
+    }
+  };
+
+  return (
+    <div style={{ height: 'calc(100vh - 104px)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ marginBottom: 12, flexShrink: 0 }}>
+        <Space wrap>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openEdit()}>新建会议</Button>
+          <Select
+            value={selectedYear}
+            onChange={(v) => setSelectedYear(v)}
+            style={{ width: 90 }}
+            options={Array.from({ length: 5 }, (_, i) => ({ value: dayjs().year() - i, label: `${dayjs().year() - i}年` }))}
+          />
+          <Input.Search placeholder="搜索会议主题" allowClear style={{ width: 200 }} value={keyword} onChange={(e) => setKeyword(e.target.value)} onSearch={(v) => setKeyword(v)} />
+          <DatePicker.RangePicker value={dateRange} onChange={(v) => setDateRange(v as [dayjs.Dayjs, dayjs.Dayjs] | null)} placeholder={['会议开始', '会议结束']} />
+          <Button icon={<ImportOutlined />} onClick={handleImport}>导入</Button>
+          <Button icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
+          <Button danger icon={<DeleteOutlined />} onClick={() => { setClearPwd(''); setClearPwdOpen(true); }}>
+            清除数据
+          </Button>
+        </Space>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <Table
+          rowKey="id" columns={columns} dataSource={pagedMeetings} size="small"
+          sticky={{ offsetHeader: 0 }}
+          scroll={{ x: 1100 }}
+          pagination={{
+            current: currentPage,
+            pageSize,
+            total: store.meetings.length,
+            showSizeChanger: true,
+            pageSizeOptions: [10, 20, 50, 100],
+            showTotal: (t, range) => `${range[0]}-${range[1]} / 共 ${t} 条`,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              if (size !== pageSize) {
+                setPageSize(size);
+                setCurrentPage(1);
+              }
+            },
+          }}
+        />
+      </div>
 
       <Modal
         title={editing ? '编辑会议' : '新建会议'}
@@ -330,10 +516,17 @@ export default function MeetingsPage() {
           </Form.Item>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="meeting_time" label="会议时间">
+              <Form.Item name="meeting_time" label="会议开始时间">
                 <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
+            <Col span={12}>
+              <Form.Item name="meeting_time_end" label="会议结束时间">
+                <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="location" label="会议地点">
                 <Input />
@@ -342,6 +535,9 @@ export default function MeetingsPage() {
           </Row>
           <Form.Item name="notes" label="备注">
             <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item name="leaders" label="参会领导">
+            <Input placeholder="请输入参会领导" />
           </Form.Item>
         </Form>
 
@@ -364,7 +560,16 @@ export default function MeetingsPage() {
       </Modal>
 
       <Modal
-        title="关联文件"
+        title={
+          <span>
+            关联文件
+            {store.meetings.find((m) => m.id === currentId) && (
+              <Tag color="blue" style={{ marginLeft: 8 }}>
+                {store.meetings.find((m) => m.id === currentId)!.subject}
+              </Tag>
+            )}
+          </span>
+        }
         open={fileVisible}
         onCancel={() => setFileVisible(false)}
         footer={null}
@@ -399,7 +604,16 @@ export default function MeetingsPage() {
       </Modal>
 
       <Modal
-        title="生成会议通知"
+        title={
+          <span>
+            生成会议通知
+            {store.meetings.find((m) => m.id === currentId) && (
+              <Tag color="blue" style={{ marginLeft: 8 }}>
+                {store.meetings.find((m) => m.id === currentId)!.subject}
+              </Tag>
+            )}
+          </span>
+        }
         open={notifyVisible}
         onCancel={() => setNotifyVisible(false)}
         width={720}
@@ -416,10 +630,10 @@ export default function MeetingsPage() {
           style={{ fontFamily: 'monospace', marginBottom: 16 }}
         />
         <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-          可用变量：{`{{主题}} {{时间}} {{地点}} {{备注}} {{参会人员}}`}
+          可用变量：{`{{主题}} {{时间}} {{地点}} {{备注}} {{参会领导}} {{参会人员}}`}
         </Typography.Text>
         <div style={{ marginBottom: 16, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {['主题','时间','地点','备注','参会人员'].map((v) => (
+          {['主题','时间','地点','备注','参会领导','参会人员'].map((v) => (
             <Button key={v} size="small" onClick={() => setTemplate(template + `{{${v}}}`)}>
               {v}
             </Button>
@@ -450,6 +664,27 @@ export default function MeetingsPage() {
         >
           {receiptText}
         </Card>
+      </Modal>
+
+      <Modal
+        title="验证密码"
+        open={clearPwdOpen}
+        onOk={async () => {
+          if (clearPwd !== 'zrzy86002718') {
+            message.error('密码错误');
+            return;
+          }
+          await store.clearAll();
+          message.success('已清除所有会议数据');
+          setClearPwdOpen(false);
+        }}
+        onCancel={() => setClearPwdOpen(false)}
+      >
+        <Input.Password
+          placeholder="请输入清除密码"
+          value={clearPwd}
+          onChange={(e) => setClearPwd(e.target.value)}
+        />
       </Modal>
     </div>
   );

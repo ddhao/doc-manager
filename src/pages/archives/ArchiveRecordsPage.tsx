@@ -137,8 +137,8 @@ export default function ArchiveRecordsPage() {
           columns={recordColumns}
           dataSource={store.records}
           size="small"
-          pagination={{ pageSize: 20, showTotal: (t) => `共 ${t} 条` }}
-          scroll={{ x: 900 }}
+          pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
+          scroll={{ x: 900, y: 'calc(100vh - 290px)' }}
         />
       </Card>
 

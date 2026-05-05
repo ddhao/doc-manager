@@ -1,23 +1,21 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, Select, DatePicker, Tag, Popconfirm,
   Upload, message, Dropdown, Row, Col, Typography,
 } from 'antd';
 import {
-  PlusOutlined, PrinterOutlined, CopyOutlined, EditOutlined,
-  DeleteOutlined, FileTextOutlined, MoreOutlined, SearchOutlined,
+  PlusOutlined, CopyOutlined, EditOutlined,
+  DeleteOutlined, FileTextOutlined, MoreOutlined, SearchOutlined, ImportOutlined, ExportOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
+import Docxtemplater from 'docxtemplater';
+import PizZip from 'pizzip';
 import { useIncomingStore, IncomingDoc, IncomingFile, DocDepartment, roleLabels } from '@/stores/incomingStore';
 import { useUnitStore } from '@/stores/unitStore';
 import { useConfigStore } from '@/stores/configStore';
 import { useArchiveStore } from '@/stores/archiveStore';
 import { copyToClipboard, db } from '@/db';
-import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
-
-pdfMake.vfs = pdfFonts.pdfMake ? (pdfFonts.pdfMake as any).vfs : pdfFonts.vfs;
 
 const statusMap: Record<string, { color: string; text: string }> = {
   pending: { color: 'blue', text: '待处理' },
@@ -46,7 +44,7 @@ const roleColorMap: Record<string, string> = {
 type DeptAssignment = { department_id: number; role: string };
 
 export default function IncomingPage() {
-  const { docs, files, loadDocs, addDoc, updateDoc, removeDoc, updateDocStatus, loadFiles, addFile, removeFile } =
+  const { docs, files, loadDocs, addDoc, updateDoc, removeDoc, updateDocStatus, batchReply, clearAll, importFromExcel, exportToExcel, loadFiles, addFile, removeFile } =
     useIncomingStore();
   const { units, loadUnits } = useUnitStore();
   const { departments, loadDepartments } = useUnitStore();
@@ -63,14 +61,18 @@ export default function IncomingPage() {
   const [deptAssignments, setDeptAssignments] = useState<DeptAssignment[]>([]);
   const [selectedDept, setSelectedDept] = useState<number | undefined>();
   const [selectedRole, setSelectedRole] = useState<string>('lead');
-  const [templateOpen, setTemplateOpen] = useState(false);
-  const [templateText, setTemplateText] = useState(defaultForwardTemplate);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [archivingDoc, setArchivingDoc] = useState<IncomingDoc | null>(null);
   const [archivedDocIds, setArchivedDocIds] = useState<Set<number>>(new Set());
   const [archiveForm] = Form.useForm();
   const archiveStore = useArchiveStore();
   const [form] = Form.useForm();
+  const [templateText, setTemplateText] = useState(defaultForwardTemplate);
+  const [generatingId, setGeneratingId] = useState<number | null>(null);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string | undefined>();
+  const [clearPwdOpen, setClearPwdOpen] = useState(false);
+  const [clearPwd, setClearPwd] = useState('');
 
   const loadArchivedIds = async () => {
     const rows = await db.all<{ doc_id: number }>(
@@ -83,16 +85,17 @@ export default function IncomingPage() {
     loadDocs(
       filterDept,
       keyword || undefined,
-      dateRange ? [dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')] : undefined
+      dateRange ? [dateRange[0].format('YYYY-MM-DD'), dateRange[1].format('YYYY-MM-DD')] : undefined,
+      filterStatus
     );
     loadUnits();
     loadDepartments();
     loadDocTypes();
     loadTags();
     loadLevels();
-    loadTemplate();
     loadArchivedIds();
-  }, [filterDept, keyword, dateRange]);
+    loadForwardTemplate();
+  }, [filterDept, keyword, dateRange, filterStatus]);
 
   const addDeptAssignment = () => {
     if (!selectedDept) return;
@@ -112,24 +115,32 @@ export default function IncomingPage() {
   const getDeptName = (deptId: number) => departments.find((d) => d.id === deptId)?.name || '';
 
   const columns: ColumnsType<IncomingDoc> = [
-    { title: 'ID', dataIndex: 'id', width: 50 },
     { title: '呈批编号', dataIndex: 'approval_number', width: 120, render: (v) => v || '-' },
     {
       title: '标题',
       dataIndex: 'title',
-      ellipsis: true,
       render: (title: string, record: IncomingDoc) => {
         const levelColorMap: Record<string, string> = {
           '特急': 'red', '加急': 'orange', '急': 'gold',
         };
         return (
-          <Space size={4}>
-            {record.level && record.level !== '平' && (
-              <Tag color={levelColorMap[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
-            )}
-            {record.document_tag && <Tag color="cyan" style={{ flexShrink: 0 }}>{record.document_tag}</Tag>}
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
-          </Space>
+          <div
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            <Space size={4}>
+              {record.level && record.level !== '平' && (
+                <Tag color={levelColorMap[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
+              )}
+              {record.document_tag && <Tag color="cyan" style={{ flexShrink: 0 }}>{record.document_tag}</Tag>}
+              <span>{title}</span>
+            </Space>
+          </div>
         );
       },
     },
@@ -149,6 +160,18 @@ export default function IncomingPage() {
       width: 110,
       sorter: (a, b) => (a.reply_deadline || '').localeCompare(b.reply_deadline || ''),
       defaultSortOrder: 'ascend',
+      render: (v) => v || '-',
+    },
+    {
+      title: '回文日期',
+      dataIndex: 'reply_date',
+      width: 160,
+      render: (v) => v || '-',
+    },
+    {
+      title: '备注',
+      dataIndex: 'notes',
+      width: 200,
       render: (v) => v || '-',
     },
     {
@@ -189,7 +212,6 @@ export default function IncomingPage() {
           <Dropdown
             menu={{
               items: [
-                { key: 'print', label: '呈批表', icon: <PrinterOutlined />, onClick: () => printApproval(record) },
                 ...(record.status === 'done' && !isArchived
                   ? [{ key: 'archive', label: '归档', icon: <FileTextOutlined />, onClick: () => openArchive(record) }]
                   : []),
@@ -197,6 +219,11 @@ export default function IncomingPage() {
                   ? [{ key: 'archived', label: '已归档', icon: <FileTextOutlined />, disabled: true }]
                   : []),
                 { key: 'files', label: '关联文件', icon: <FileTextOutlined />, onClick: () => openFiles(record.id) },
+                {
+                  key: 'generate', label: '生成呈批表', icon: <FileTextOutlined />,
+                  disabled: generatingId === record.id,
+                  onClick: () => generateApprovalDocx(record),
+                },
                 { type: 'divider' as const },
                 {
                   key: 'delete', label: '删除', danger: true, icon: <DeleteOutlined />,
@@ -252,47 +279,6 @@ export default function IncomingPage() {
     form.resetFields();
   };
 
-  const printApproval = (record: IncomingDoc) => {
-    const deptLines = (record.departments || []).map(
-      (d) => `  ${d.department_name || ''}（${roleLabels[d.role]}）`
-    ).join('\n');
-
-    const docDef = {
-      content: [
-        { text: '呈 批 表', style: 'header', alignment: 'center', margin: [0, 0, 0, 16] },
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1 }] },
-        { text: `呈批编号：${record.approval_number || ''}`, style: 'info', margin: [0, 12, 0, 4] },
-        { text: `来文单位：${record.send_unit_name || ''}`, style: 'info', margin: [0, 4, 0, 4] },
-        { text: `公文类型：${record.document_type || ''}`, style: 'info', margin: [0, 4, 0, 4] },
-        { text: `公文标签：${record.document_tag || ''}`, style: 'info', margin: [0, 4, 0, 4] },
-        { text: `公文标题：${record.title}`, style: 'info', margin: [0, 4, 0, 4] },
-        { text: `转发股室：`, style: 'info', margin: [0, 8, 0, 2] },
-        { text: deptLines || '  -', style: 'info', margin: [20, 0, 0, 4] },
-        { text: `回复日期：${record.reply_deadline || ''}`, style: 'info', margin: [0, 8, 0, 4] },
-        { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1 }], margin: [0, 12, 0, 12] },
-        { text: `摘要：`, style: 'subheader' },
-        { text: record.summary || '', style: 'content', margin: [12, 4, 0, 0] },
-      ],
-      styles: {
-        header: { fontSize: 22, bold: true },
-        info: { fontSize: 14, margin: [0, 4, 0, 4] },
-        subheader: { fontSize: 14, bold: true, margin: [0, 8, 0, 4] },
-        content: { fontSize: 14, lineHeight: 1.6 },
-      },
-      pageSize: 'A4',
-      pageMargins: [40, 40, 40, 40],
-    };
-
-    const pdfDoc = pdfMake.createPdf(docDef as any);
-    pdfDoc.getDataUrl((dataUrl: string) => {
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`<iframe src="${dataUrl}" width="100%" height="100%"></iframe>`);
-        win.document.title = '呈批表预览';
-      }
-    });
-  };
-
   const openArchive = async (record: IncomingDoc) => {
     setArchivingDoc(record);
     await archiveStore.loadBoxes();
@@ -315,19 +301,108 @@ export default function IncomingPage() {
     setArchivingDoc(null);
   };
 
-  const loadTemplate = async () => {
+  const handleImport = async () => {
+    const result = await window.electronAPI.file.openFile({
+      filters: [{ name: 'Excel文件', extensions: ['xlsx', 'xls'] }],
+    });
+    if (!result) return;
+    try {
+      const { imported, skipped } = await importFromExcel(result.data);
+      message.success(`导入完成：成功 ${imported} 条${skipped > 0 ? `，跳过 ${skipped} 条` : ''}`);
+    } catch (e: any) {
+      message.error(`导入失败：${e.message || '请检查文件格式'}`);
+    }
+  };
+
+  const handleExport = async () => {
+    try {
+      const data = await exportToExcel();
+      await window.electronAPI.file.saveFile(data, {
+        defaultName: '2026年收文记录.xlsx',
+        filters: [{ name: 'Excel文件', extensions: ['xlsx'] }],
+      });
+      message.success('导出成功');
+    } catch (e: any) {
+      message.error(`导出失败：${e.message || '未知错误'}`);
+    }
+  };
+
+  const loadForwardTemplate = async () => {
     const row = await db.get<{ value: string }>(
       "SELECT value FROM config WHERE key = 'forward_template'"
     );
     setTemplateText(row?.value || defaultForwardTemplate);
   };
 
-  const saveTemplate = async () => {
-    await db.run(
-      "INSERT OR REPLACE INTO config (key, value) VALUES ('forward_template', ?)",
-      [templateText]
-    );
-    message.success('转发模版已保存');
+  const generateApprovalDocx = async (record: IncomingDoc) => {
+    setGeneratingId(record.id);
+    try {
+      const row = await db.get<{ value: string }>(
+        "SELECT value FROM config WHERE key = 'approval_template'"
+      );
+      if (!row?.value) {
+        message.warning('请先上传呈批表模版');
+        return;
+      }
+
+      // Decode base64 to binary
+      const binaryStr = atob(row.value);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      const deps = record.departments || [];
+      const now = dayjs();
+      const today = now.format('YYYY年M月D日');
+
+      // Build data for template filling
+      const data: Record<string, string> = {
+        '收文日期': record.created_at ? dayjs(record.created_at).format('YYYY-M-D') : '',
+        '呈批编号': record.approval_number || '',
+        '来文单位': record.send_unit_name || '',
+        '来文字号': record.document_number || '',
+        '密级': record.security_level || '',
+        '公文等级': record.level || '',
+        '标题': record.title || '',
+        '摘要': record.summary || '',
+        '经办人': record.handler || '',
+        '审核人': record.reviewer || '',
+        '打印日期': today,
+        '页脚时间': now.format('M.D HH:mm'),
+        '回复日期': record.reply_deadline ? dayjs(record.reply_deadline).format('YYYY年M月D日') : '',
+        '公文类型': record.document_type || '',
+        '公文标签': record.document_tag || '',
+        '转发股室': formatDeptText(deps),
+        '主办股室': deps.filter((d) => d.role === 'lead').map((d) => d.department_name || '').join('、'),
+        '协办股室': deps.filter((d) => d.role === 'assist').map((d) => d.department_name || '').join('、'),
+        '汇总股室': deps.filter((d) => d.role === 'summary').map((d) => d.department_name || '').join('、'),
+        '阅办股室': deps.filter((d) => d.role === 'read_handle').map((d) => d.department_name || '').join('、'),
+        '阅知股室': deps.filter((d) => d.role === 'read_notify').map((d) => d.department_name || '').join('、'),
+      };
+
+      const zip = new PizZip(bytes);
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+      });
+      doc.setData(data);
+      doc.render();
+
+      const output = doc.getZip().generate({
+        type: 'arraybuffer',
+        compression: 'DEFLATE',
+      }) as ArrayBuffer;
+
+      const fileName = `${record.approval_number || record.id}${record.title}.wps`;
+      const tmpPath = await window.electronAPI.file.saveTemp(output, fileName);
+      await window.electronAPI.shell.openPath(tmpPath);
+      message.success(`已生成呈批表: ${fileName}`);
+    } catch (e: any) {
+      message.error(`生成失败: ${e.message || '未知错误'}`);
+    } finally {
+      setGeneratingId(null);
+    }
   };
 
   const formatDeptText = (deps: DocDepartment[]): string => {
@@ -419,6 +494,7 @@ export default function IncomingPage() {
             form.setFieldsValue({
               document_type: '镇府公文',
               approval_number: approvalNumber,
+              handler: '刘浩',
             });
             setFormOpen(true);
           }}
@@ -449,15 +525,38 @@ export default function IncomingPage() {
             <Select.Option key={d.id} value={d.id}>{d.name}</Select.Option>
           ))}
         </Select>
-        <Button
-          icon={<EditOutlined />}
-          onClick={async () => {
-            await loadTemplate();
-            setTemplateOpen(true);
-          }}
+        <Select
+          allowClear
+          placeholder="按状态筛选"
+          style={{ width: 130 }}
+          value={filterStatus}
+          onChange={(v) => setFilterStatus(v)}
         >
-          转发模版
+          {Object.entries(statusMap).map(([key, st]) => (
+            <Select.Option key={key} value={key}>
+              <Tag color={st.color}>{st.text}</Tag>
+            </Select.Option>
+          ))}
+        </Select>
+        <Button icon={<ImportOutlined />} onClick={handleImport}>导入</Button>
+        <Button icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
+        <Button danger icon={<DeleteOutlined />} onClick={() => { setClearPwd(''); setClearPwdOpen(true); }}>
+          清除数据
         </Button>
+        {selectedRowKeys.length > 0 && (
+          <Popconfirm
+            title={`确定将选中的 ${selectedRowKeys.length} 条记录标记为已办结？回文时间将为当前时间。`}
+            onConfirm={async () => {
+              await batchReply(selectedRowKeys.map(Number));
+              message.success(`已办结 ${selectedRowKeys.length} 条记录`);
+              setSelectedRowKeys([]);
+            }}
+          >
+            <Button type="primary" icon={<FileTextOutlined />}>
+              一键回文（{selectedRowKeys.length}）
+            </Button>
+          </Popconfirm>
+        )}
       </Space>
 
       <Table
@@ -466,8 +565,15 @@ export default function IncomingPage() {
         dataSource={docs}
         size="small"
         loading={loading}
-        scroll={{ x: 1200 }}
-        pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `共 ${t} 条` }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (keys) => setSelectedRowKeys(keys),
+          getCheckboxProps: (record) => ({
+            disabled: !!record.reply_date || !record.reply_deadline,
+          }),
+        }}
+        scroll={{ x: 1500, y: 'calc(100vh - 230px)' }}
+        pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
       />
 
       <Modal
@@ -520,8 +626,35 @@ export default function IncomingPage() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={6}>
+              <Form.Item name="document_number" label="来文字号">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="security_level" label="密级">
+                <Select allowClear placeholder="选择密级">
+                  <Select.Option value="绝密">绝密</Select.Option>
+                  <Select.Option value="机密">机密</Select.Option>
+                  <Select.Option value="秘密">秘密</Select.Option>
+                  <Select.Option value="普">普</Select.Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={8}>
               <Form.Item name="approval_number" label="呈批编号">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="handler" label="经办人">
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="reviewer" label="审核人">
                 <Input />
               </Form.Item>
             </Col>
@@ -635,6 +768,9 @@ export default function IncomingPage() {
           <Form.Item name="reply_deadline" label="回复日期">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
+          <Form.Item name="notes" label="备注">
+            <Input.TextArea rows={3} />
+          </Form.Item>
           <Form.Item name="summary" label="摘要">
             <Input.TextArea rows={4} />
           </Form.Item>
@@ -677,36 +813,6 @@ export default function IncomingPage() {
       </Modal>
 
       <Modal
-        title="转发内容模版"
-        open={templateOpen}
-        onOk={() => { saveTemplate(); setTemplateOpen(false); }}
-        onCancel={() => setTemplateOpen(false)}
-        width={680}
-        okText="保存模版"
-      >
-        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-          可用变量：{`{{来文单位}} {{标题}} {{转发股室}} {{收文员}} {{呈批编号}} {{回复日期}} {{公文类型}} {{公文标签}} {{摘要}}`}
-        </Typography.Text>
-        <Input.TextArea
-          rows={10}
-          value={templateText}
-          onChange={(e) => setTemplateText(e.target.value)}
-          style={{ fontFamily: 'monospace', fontSize: 13 }}
-        />
-        <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {['来文单位','标题','转发股室','收文员','呈批编号','回复日期','公文类型','公文标签','摘要'].map((v) => (
-            <Button
-              key={v}
-              size="small"
-              onClick={() => setTemplateText(templateText + `{{${v}}}`)}
-            >
-              {v}
-            </Button>
-          ))}
-        </div>
-      </Modal>
-
-      <Modal
         title="公文归档"
         open={archiveOpen}
         onOk={handleArchiveSubmit}
@@ -743,6 +849,28 @@ export default function IncomingPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Modal
+        title="验证密码"
+        open={clearPwdOpen}
+        onOk={async () => {
+          if (clearPwd !== 'zrzy86002718') {
+            message.error('密码错误');
+            return;
+          }
+          await clearAll();
+          message.success('已清除所有收文数据');
+          setClearPwdOpen(false);
+        }}
+        onCancel={() => setClearPwdOpen(false)}
+      >
+        <Input.Password
+          placeholder="请输入清除密码"
+          value={clearPwd}
+          onChange={(e) => setClearPwd(e.target.value)}
+        />
+      </Modal>
+
     </div>
   );
 }

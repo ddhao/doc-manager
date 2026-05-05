@@ -99,6 +99,8 @@ export default function ContactsPage() {
         columns={columns}
         dataSource={contacts}
         size="small"
+        scroll={{ y: 'calc(100vh - 230px)' }}
+        pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
         rowSelection={{
           selectedRowKeys,
           onChange: (keys) => setSelectedRowKeys(keys as number[]),

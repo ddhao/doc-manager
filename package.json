@@ -12,7 +12,12 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "better-sqlite3": "^11.6.0"
+    "@hufe921/canvas-editor": "^0.9.132",
+    "@tinymce/tinymce-react": "^6.3.0",
+    "better-sqlite3": "^11.6.0",
+    "docxtemplater": "^3.68.6",
+    "pizzip": "^3.2.0",
+    "tinymce": "^7.9.2"
   },
   "devDependencies": {
     "@ant-design/icons": "^5.5.0",
@@ -34,6 +39,7 @@
     "vite": "^6.0.0",
     "vite-plugin-electron": "^0.28.8",
     "vite-plugin-electron-renderer": "^0.14.6",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.0"
   },
   "build": {
@@ -52,13 +58,23 @@
     ],
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "public/icon.png"
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "public/icon.png",
       "asarUnpack": [

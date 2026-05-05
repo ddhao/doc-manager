@@ -81,7 +81,7 @@ export default function DepartmentsPage() {
       >
         新增股室
       </Button>
-      <Table rowKey="id" columns={columns} dataSource={departments} size="small" />
+      <Table rowKey="id" columns={columns} dataSource={departments} size="small" scroll={{ y: 'calc(100vh - 200px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
       <Modal
         title={editing ? '编辑股室' : '新增股室'}
         open={open}

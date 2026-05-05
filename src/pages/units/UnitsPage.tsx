@@ -47,7 +47,7 @@ export default function UnitsPage() {
           新增单位
         </Button>
       </Space>
-      <Table rowKey="id" columns={columns} dataSource={units} size="small" />
+      <Table rowKey="id" columns={columns} dataSource={units} size="small" scroll={{ y: 'calc(100vh - 200px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
     </div>
   );
 }
