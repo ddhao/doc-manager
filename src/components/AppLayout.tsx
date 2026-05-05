@@ -74,15 +74,18 @@ export default function AppLayout() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: 8,
             color: '#fff',
-            fontSize: collapsed ? 14 : 18,
+            fontSize: collapsed ? 14 : 16,
             fontWeight: 600,
             borderBottom: '1px solid rgba(255,255,255,0.1)',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
+            padding: '0 12px',
           }}
         >
-          {collapsed ? '收文' : '办公室收文管理系统'}
+          <img src="/icon.png" alt="logo" style={{ width: 28, height: 28, flexShrink: 0 }} />
+          {collapsed ? null : '办公室收文管理系统'}
         </div>
         <Menu
           theme="dark"
