@@ -139,6 +139,17 @@ export default function IncomingPage() {
               )}
               {record.document_tag && <Tag color="cyan" style={{ flexShrink: 0 }}>{record.document_tag}</Tag>}
               <span>{title}</span>
+              <Button
+                type="link"
+                size="small"
+                icon={<CopyOutlined />}
+                style={{ padding: 0, flexShrink: 0 }}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await copyToClipboard(title);
+                  message.success('标题已复制');
+                }}
+              />
             </Space>
           </div>
         );
@@ -369,7 +380,8 @@ export default function IncomingPage() {
         '经办人': record.handler || '',
         '审核人': record.reviewer || '',
         '打印日期': today,
-        '页脚时间': now.format('M.D HH:mm'),
+        '页脚时间': now.format('M.D  HH:mm'),
+        '转发时间': now.format('YYYY年M月D日 HH:mm'),
         '回复日期': record.reply_deadline ? dayjs(record.reply_deadline).format('YYYY年M月D日') : '',
         '公文类型': record.document_type || '',
         '公文标签': record.document_tag || '',
@@ -619,7 +631,9 @@ export default function IncomingPage() {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="send_unit_id" label="来文单位">
-                <Select allowClear placeholder="选择来文单位">
+                <Select allowClear showSearch placeholder="选择来文单位"
+                  filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                >
                   {units.map((u) => (
                     <Select.Option key={u.id} value={u.id}>{u.name}</Select.Option>
                   ))}

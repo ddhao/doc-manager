@@ -139,7 +139,7 @@ export const useIncomingStore = create<IncomingState>((set) => ({
       sql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    sql += ' ORDER BY i.reply_deadline ASC';
+    sql += ' ORDER BY i.created_at DESC';
     const rows = await db.all<IncomingDoc>(sql, params);
 
     const docIds = rows.map((r) => r.id);

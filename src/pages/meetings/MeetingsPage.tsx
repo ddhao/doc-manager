@@ -320,6 +320,7 @@ export default function MeetingsPage() {
         meeting_time: record.meeting_time ? dayjs(record.meeting_time) : null,
         meeting_time_end: record.meeting_time_end ? dayjs(record.meeting_time_end) : null,
       });
+      setTargetKeys([]);
       loadAttendeeKeys(record.id);
     } else {
       setEditing(null);
@@ -359,7 +360,7 @@ export default function MeetingsPage() {
       }
       receiptParts.push(
         store.attendees
-          .map((a: any) => `${a.contact_name} ${a.contact_title || ''} ${a.contact_phone || ''}`.trim())
+          .map((a: any) => `${a.contact_name} ${a.contact_title || ''} ${a.contact_phone || ''}`.trim().replace(/\s+/g, ' '))
           .join('\n')
       );
       setReceiptText(receiptParts.join('\n') || '暂无参会人员');

@@ -146,15 +146,23 @@ export default function DashboardPage() {
     {
       title: '标题',
       dataIndex: 'title',
-      ellipsis: true,
       render: (title: string, record: IncomingDoc) => (
-        <Space size={4}>
-          {record.level && record.level !== '平' && (
-            <Tag color={levelColors[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
-          )}
-          {record.document_tag && <Tag color="cyan" style={{ flexShrink: 0 }}>{record.document_tag}</Tag>}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
-        </Space>
+        <div
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          <Space size={4}>
+            {record.level && record.level !== '平' && (
+              <Tag color={levelColors[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
+            )}
+            {record.document_tag && <Tag color="cyan" style={{ flexShrink: 0 }}>{record.document_tag}</Tag>}
+            <span>{title}</span>
+          </Space>
+        </div>
       ),
     },
     {
@@ -251,14 +259,22 @@ export default function DashboardPage() {
     {
       title: '发文标题',
       dataIndex: 'title',
-      ellipsis: true,
       render: (title: string, record: OutgoingDoc) => (
-        <Space size={4}>
-          {record.level && record.level !== '平' && (
-            <Tag color={outgoingLevelColors[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
-          )}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
-        </Space>
+        <div
+          style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          <Space size={4}>
+            {record.level && record.level !== '平' && (
+              <Tag color={outgoingLevelColors[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
+            )}
+            <span>{title}</span>
+          </Space>
+        </div>
       ),
     },
     {

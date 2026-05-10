@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Table, Button, Input, Space, Popconfirm, Modal, Form, Select, message } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { useUnitStore, Contact } from '@/stores/unitStore';
 
@@ -10,12 +10,26 @@ export default function ContactsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Contact | null>(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState<number[]>([]);
+  const [keyword, setKeyword] = useState('');
   const [form] = Form.useForm();
 
   useEffect(() => {
     loadContacts();
     loadDepartments();
   }, []);
+
+  const filteredContacts = useMemo(() => {
+    if (!keyword) return contacts;
+    const kw = keyword.toLowerCase();
+    return contacts.filter(
+      (c) =>
+        c.name.toLowerCase().includes(kw) ||
+        (c.alias || '').toLowerCase().includes(kw) ||
+        (c.title || '').toLowerCase().includes(kw) ||
+        (c.phone || '').toLowerCase().includes(kw) ||
+        (c.department_name || '').toLowerCase().includes(kw)
+    );
+  }, [contacts, keyword]);
 
   const columns: ColumnsType<Contact> = [
     { title: 'ID', dataIndex: 'id', width: 60 },
@@ -69,7 +83,7 @@ export default function ContactsPage() {
     }
     const selected = contacts.filter((c) => selectedRowKeys.includes(c.id));
     const lines = selected.map(
-      (c) => `姓名：${c.name}  职务：${c.title || ''}  电话：${c.phone || ''}`
+      (c) => `${c.name} ${c.title || ''} ${c.phone || ''}`.trim().replace(/\s+/g, ' ')
     );
     const text = `参会回执\n${'='.repeat(30)}\n${lines.join('\n')}`;
     window.electronAPI.clipboard.writeText(text);
@@ -90,6 +104,14 @@ export default function ContactsPage() {
         >
           新增人员
         </Button>
+        <Input.Search
+          placeholder="搜索姓名、职务、电话、股室"
+          allowClear
+          style={{ width: 260 }}
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+          onSearch={(v) => setKeyword(v)}
+        />
         <Button onClick={generateReceipt} disabled={selectedRowKeys.length === 0}>
           生成参会回执
         </Button>
@@ -97,7 +119,7 @@ export default function ContactsPage() {
       <Table
         rowKey="id"
         columns={columns}
-        dataSource={contacts}
+        dataSource={filteredContacts}
         size="small"
         scroll={{ y: 'calc(100vh - 230px)' }}
         pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
