@@ -514,7 +514,7 @@ export default function IncomingPage() {
           收文登记
         </Button>
         <Input.Search
-          placeholder="搜索标题"
+          placeholder="搜索标题/来文单位"
           allowClear
           style={{ width: 200 }}
           value={keyword}
@@ -635,7 +635,7 @@ export default function IncomingPage() {
                   filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
                 >
                   {units.map((u) => (
-                    <Select.Option key={u.id} value={u.id}>{u.name}</Select.Option>
+                    <Select.Option key={u.id} value={u.id} label={u.name}>{u.name}</Select.Option>
                   ))}
                 </Select>
               </Form.Item>

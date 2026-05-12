@@ -124,8 +124,8 @@ export const useIncomingStore = create<IncomingState>((set) => ({
       params.push(departmentId);
     }
     if (keyword) {
-      conditions.push('i.title LIKE ?');
-      params.push(`%${keyword}%`);
+      conditions.push('(i.title LIKE ? OR u.name LIKE ?)');
+      params.push(`%${keyword}%`, `%${keyword}%`);
     }
     if (dateRange) {
       conditions.push('i.created_at >= ? AND i.created_at <= ?');
