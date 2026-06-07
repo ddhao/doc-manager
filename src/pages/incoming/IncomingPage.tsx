@@ -119,10 +119,7 @@ export default function IncomingPage() {
     {
       title: '标题',
       dataIndex: 'title',
-      render: (title: string, record: IncomingDoc) => {
-        const levelColorMap: Record<string, string> = {
-          '特急': 'red', '加急': 'orange', '急': 'gold',
-        };
+      render: (title: string) => {
         return (
           <div
             style={{
@@ -133,25 +130,37 @@ export default function IncomingPage() {
               whiteSpace: 'pre-wrap',
             }}
           >
-            <Space size={4}>
-              {record.level && record.level !== '平' && (
-                <Tag color={levelColorMap[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
-              )}
-              {record.document_tag && <Tag color="cyan" style={{ flexShrink: 0 }}>{record.document_tag}</Tag>}
-              <span>{title}</span>
-              <Button
-                type="link"
-                size="small"
-                icon={<CopyOutlined />}
-                style={{ padding: 0, flexShrink: 0 }}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  await copyToClipboard(title);
-                  message.success('标题已复制');
-                }}
-              />
-            </Space>
+            <span>{title}</span>
+            <Button
+              type="link"
+              size="small"
+              icon={<CopyOutlined />}
+              style={{ padding: 0, flexShrink: 0 }}
+              onClick={async (e) => {
+                e.stopPropagation();
+                await copyToClipboard(title);
+                message.success('标题已复制');
+              }}
+            />
           </div>
+        );
+      },
+    },
+    {
+      title: '标签',
+      dataIndex: 'document_tag',
+      width: 120,
+      render: (_tag: string, record: IncomingDoc) => {
+        const levelColorMap: Record<string, string> = {
+          '特急': 'red', '加急': 'orange', '急': 'gold',
+        };
+        return (
+          <Space size={4} wrap>
+            {record.level && record.level !== '平' && (
+              <Tag color={levelColorMap[record.level] || 'default'}>{record.level}</Tag>
+            )}
+            {record.document_tag && <Tag color="cyan">{record.document_tag}</Tag>}
+          </Space>
         );
       },
     },
@@ -170,7 +179,6 @@ export default function IncomingPage() {
       dataIndex: 'reply_deadline',
       width: 110,
       sorter: (a, b) => (a.reply_deadline || '').localeCompare(b.reply_deadline || ''),
-      defaultSortOrder: 'ascend',
       render: (v) => v || '-',
     },
     {

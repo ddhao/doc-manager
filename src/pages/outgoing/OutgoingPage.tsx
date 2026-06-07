@@ -4,7 +4,7 @@ import {
   Transfer, Divider,
 } from 'antd';
 import {
-  PlusOutlined, EditOutlined, DeleteOutlined, MoreOutlined, CheckCircleOutlined, FileTextOutlined,
+  PlusOutlined, EditOutlined, DeleteOutlined, MoreOutlined, CheckCircleOutlined, FileTextOutlined, CopyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -71,14 +71,20 @@ export default function OutgoingPage() {
     {
       title: '发文标题',
       dataIndex: 'title',
-      ellipsis: true,
+      width: 300,
       render: (title: string, record: OutgoingDoc) => (
-        <Space size={4}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
           {record.level && record.level !== '平' && (
-            <Tag color={levelColors[record.level] || 'default'} style={{ flexShrink: 0 }}>{record.level}</Tag>
+            <Tag color={levelColors[record.level] || 'default'} style={{ flexShrink: 0, marginTop: 2 }}>{record.level}</Tag>
           )}
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
-        </Space>
+          <span style={{
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            wordBreak: 'break-all',
+          }}>{title}</span>
+        </div>
       ),
     },
     {
@@ -145,6 +151,7 @@ export default function OutgoingPage() {
         <Dropdown
           menu={{
             items: [
+              { key: 'copy', label: '复制', icon: <CopyOutlined />, onClick: () => openCopy(record) },
               { key: 'edit', label: '编辑', icon: <EditOutlined />, disabled: isArchived, onClick: () => openEdit(record) },
               ...(record.status === 'done' && !isArchived
                 ? [{ key: 'archive', label: '归档', icon: <FileTextOutlined />, onClick: () => openArchive(record) }]
@@ -165,6 +172,17 @@ export default function OutgoingPage() {
       );},
     },
   ];
+
+  const openCopy = (record: OutgoingDoc) => {
+    setEditing(null);
+    form.setFieldsValue({
+      title: record.title,
+      level: record.level,
+      reply_deadline: record.reply_deadline ? dayjs(record.reply_deadline) : null,
+    });
+    setTargetKeys((record.units || []).map((u) => String(u.unit_id)));
+    setFormOpen(true);
+  };
 
   const openEdit = (record: OutgoingDoc) => {
     setEditing(record);

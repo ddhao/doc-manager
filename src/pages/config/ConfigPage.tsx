@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tabs, Table, Button, Input, Popconfirm, Space, Tag, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { useConfigStore, DocLevel, DocType, DocTag, DispatchType } from '@/stores/configStore';
+import { useConfigStore, DocLevel, DocType, DocTag, DispatchType, ApplicationType } from '@/stores/configStore';
 
 export default function ConfigPage() {
   return (
@@ -14,6 +14,7 @@ export default function ConfigPage() {
           { key: 'docTypes', label: '公文类型', children: <DocTypeConfig /> },
           { key: 'dispatchTypes', label: '发文类型', children: <DispatchTypeConfig /> },
           { key: 'tags', label: '公文标签', children: <TagConfig /> },
+          { key: 'appTypes', label: '申请类型', children: <AppTypeConfig /> },
         ]}
       />
     </div>
@@ -168,6 +169,53 @@ function TagConfig() {
         </Button>
       </Space>
       <Table rowKey="id" columns={columns} dataSource={tags} size="small" scroll={{ y: 'calc(100vh - 250px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
+    </div>
+  );
+}
+
+function AppTypeConfig() {
+  const { appTypes, loadAppTypes, addAppType, removeAppType } = useConfigStore();
+  const [name, setName] = useState('');
+
+  useEffect(() => { loadAppTypes(); }, []);
+
+  const columns: ColumnsType<ApplicationType> = [
+    { title: 'ID', dataIndex: 'id', width: 80 },
+    { title: '申请类型', dataIndex: 'name' },
+    {
+      title: '操作',
+      width: 100,
+      render: (_, record) => (
+        <Popconfirm title="确定删除？" onConfirm={() => removeAppType(record.id)}>
+          <Button type="link" danger icon={<DeleteOutlined />}>删除</Button>
+        </Popconfirm>
+      ),
+    },
+  ];
+
+  return (
+    <div>
+      <Space style={{ marginBottom: 16 }}>
+        <Input
+          placeholder="输入申请类型名称"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={{ width: 200 }}
+        />
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={async () => {
+            if (!name.trim()) return;
+            await addAppType(name.trim());
+            setName('');
+            message.success('添加成功');
+          }}
+        >
+          添加
+        </Button>
+      </Space>
+      <Table rowKey="id" columns={columns} dataSource={appTypes} size="small" scroll={{ y: 'calc(100vh - 250px)' }} pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }} />
     </div>
   );
 }

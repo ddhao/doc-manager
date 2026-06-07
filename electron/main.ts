@@ -6,12 +6,17 @@ import './ipc/db';
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
+  const iconPath = app.isPackaged
+    ? join(__dirname, '../dist/icon.png')
+    : join(app.getAppPath(), 'public/icon.png');
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1200,
     minHeight: 700,
     title: '办公室收文管理系统',
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,

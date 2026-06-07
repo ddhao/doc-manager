@@ -31,6 +31,9 @@ export default function DashboardPage() {
   const [filterDept, setFilterDept] = useState<number | undefined>();
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>('all');
   const [meetingFilter, setMeetingFilter] = useState<MeetingFilter>('all');
+  const [incomingPageSize, setIncomingPageSize] = useState(10);
+  const [outgoingPageSize, setOutgoingPageSize] = useState(10);
+  const [meetingPageSize, setMeetingPageSize] = useState(10);
 
   useEffect(() => {
     loadIncoming(filterDept);
@@ -358,7 +361,7 @@ export default function DashboardPage() {
         }
       >
         <Table rowKey="id" columns={incomingColumns} dataSource={filteredDocs} size="small" scroll={{ x: 900, y: 'calc(100vh - 380px)' }}
-          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
+          pagination={{ pageSize: incomingPageSize, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条`, onChange: (_, size) => setIncomingPageSize(size) }}
           onRow={(record) => ({ style: { ...getRowStyle(record), transition: 'background 0.3s' } })}
         />
       </Card>
@@ -386,7 +389,7 @@ export default function DashboardPage() {
       </Row>
       <Card size="small" title="需要关注的发文">
         <Table rowKey="id" columns={outgoingColumns} dataSource={needReplyOutgoing} size="small" scroll={{ x: 800, y: 'calc(100vh - 380px)' }}
-          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
+          pagination={{ pageSize: outgoingPageSize, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条`, onChange: (_, size) => setOutgoingPageSize(size) }}
           onRow={(record) => ({ style: { ...getRowStyle(record), transition: 'background 0.3s' } })}
         />
       </Card>
@@ -417,7 +420,7 @@ export default function DashboardPage() {
         title={meetingFilter === 'today' ? '今日会议' : meetingFilter === 'week' ? '近7日会议（不含今天）' : '即将召开的会议'}
       >
         <Table rowKey="id" columns={meetingColumns} dataSource={filteredMeetings} size="small" scroll={{ x: 800, y: 'calc(100vh - 380px)' }}
-          pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
+          pagination={{ pageSize: meetingPageSize, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条`, onChange: (_, size) => setMeetingPageSize(size) }}
         />
       </Card>
     </div>

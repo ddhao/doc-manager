@@ -14,6 +14,9 @@ import {
   FolderOpenOutlined,
   CloudServerOutlined,
   FileTextOutlined,
+  ClockCircleOutlined,
+  ApartmentOutlined,
+  FileAddOutlined,
 } from '@ant-design/icons';
 
 const { Sider, Content, Header } = Layout;
@@ -31,6 +34,9 @@ const pageTitles: Record<string, string> = {
   '/config': '基本配置',
   '/backup': '备份管理',
   '/templates': '模版管理',
+  '/periodic': '定期任务',
+  '/workflow': '流程管理',
+  '/applications': '申请管理',
 };
 
 const menuItems: MenuProps['items'] = [
@@ -49,6 +55,10 @@ const menuItems: MenuProps['items'] = [
   { key: '/backup', icon: <CloudServerOutlined />, label: '备份管理' },
   { type: 'divider' },
   { key: '/templates', icon: <FileTextOutlined />, label: '模版管理' },
+  { type: 'divider' },
+  { key: '/periodic', icon: <ClockCircleOutlined />, label: '定期任务' },
+  { key: '/workflow', icon: <ApartmentOutlined />, label: '流程管理' },
+  { key: '/applications', icon: <FileAddOutlined />, label: '申请管理' },
 ];
 
 export default function AppLayout() {
@@ -84,7 +94,7 @@ export default function AppLayout() {
             padding: '0 12px',
           }}
         >
-          <img src="/icon.png" alt="logo" style={{ width: 28, height: 28, flexShrink: 0 }} />
+          <img src="./icon.png" alt="logo" style={{ width: 28, height: 28, flexShrink: 0 }} />
           {collapsed ? null : '办公室收文管理系统'}
         </div>
         <Menu

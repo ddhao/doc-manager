@@ -22,11 +22,17 @@ export interface DispatchType {
   name: string;
 }
 
+export interface ApplicationType {
+  id: number;
+  name: string;
+}
+
 interface ConfigState {
   levels: DocLevel[];
   docTypes: DocType[];
   tags: DocTag[];
   dispatchTypes: DispatchType[];
+  appTypes: ApplicationType[];
   loading: boolean;
 
   loadLevels: () => Promise<void>;
@@ -44,6 +50,10 @@ interface ConfigState {
   loadDispatchTypes: () => Promise<void>;
   addDispatchType: (name: string) => Promise<void>;
   removeDispatchType: (id: number) => Promise<void>;
+
+  loadAppTypes: () => Promise<void>;
+  addAppType: (name: string) => Promise<void>;
+  removeAppType: (id: number) => Promise<void>;
 }
 
 export const useConfigStore = create<ConfigState>((set) => ({
@@ -51,6 +61,7 @@ export const useConfigStore = create<ConfigState>((set) => ({
   docTypes: [],
   tags: [],
   dispatchTypes: [],
+  appTypes: [],
   loading: false,
 
   loadLevels: async () => {
@@ -103,5 +114,18 @@ export const useConfigStore = create<ConfigState>((set) => ({
   removeDispatchType: async (id: number) => {
     await db.run('DELETE FROM dispatch_types WHERE id = ?', [id]);
     set((s) => ({ dispatchTypes: s.dispatchTypes.filter((t) => t.id !== id) }));
+  },
+
+  loadAppTypes: async () => {
+    const rows = await db.all<ApplicationType>('SELECT * FROM application_types ORDER BY id');
+    set({ appTypes: rows });
+  },
+  addAppType: async (name: string) => {
+    await db.run('INSERT OR IGNORE INTO application_types (name) VALUES (?)', [name]);
+    await useConfigStore.getState().loadAppTypes();
+  },
+  removeAppType: async (id: number) => {
+    await db.run('DELETE FROM application_types WHERE id = ?', [id]);
+    set((s) => ({ appTypes: s.appTypes.filter((t) => t.id !== id) }));
   },
 }));

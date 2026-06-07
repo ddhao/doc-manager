@@ -182,6 +182,76 @@ function initTables(db: Database.Database) {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS periodic_tasks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT,
+      reminder_day INTEGER NOT NULL,
+      start_date TEXT NOT NULL,
+      end_date TEXT,
+      status TEXT DEFAULT 'active',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workflow_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS workflow_stages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      template_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      has_approvers INTEGER DEFAULT 1,
+      sort_order INTEGER DEFAULT 0,
+      FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS workflow_approvers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      stage_id INTEGER NOT NULL,
+      approver_name TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      FOREIGN KEY (stage_id) REFERENCES workflow_stages(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS application_types (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS applications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      applicant TEXT,
+      workflow_template_id INTEGER,
+      current_stage_order INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (type_id) REFERENCES application_types(id),
+      FOREIGN KEY (workflow_template_id) REFERENCES workflow_templates(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS approvals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      application_id INTEGER NOT NULL,
+      stage_order INTEGER DEFAULT 0,
+      stage_name TEXT,
+      approver_name TEXT,
+      status TEXT DEFAULT 'pending',
+      comment TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (application_id) REFERENCES applications(id) ON DELETE CASCADE
+    );
   `);
 
   // Migration: add document_tag column for existing databases
@@ -315,6 +385,44 @@ function initTables(db: Database.Database) {
   try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN handler TEXT`); } catch { /* exists */ }
   try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN reviewer TEXT`); } catch { /* exists */ }
 
+  // Migration: workflow_stages schema v2 — replace stage_type enum with user-defined name + has_approvers flag
+  try {
+    const colInfo = db.prepare("PRAGMA table_info('workflow_stages')").all() as { name: string }[];
+    const colNames = colInfo.map((c) => c.name);
+    if (colNames.includes('stage_type') && !colNames.includes('has_approvers')) {
+      db.exec(`
+        DROP TABLE IF EXISTS workflow_approvers;
+        DROP TABLE IF EXISTS workflow_stages;
+        DROP TABLE IF EXISTS workflow_templates;
+      `);
+      // Recreate with new schema
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workflow_templates (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          description TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS workflow_stages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          template_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          has_approvers INTEGER DEFAULT 1,
+          sort_order INTEGER DEFAULT 0,
+          FOREIGN KEY (template_id) REFERENCES workflow_templates(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS workflow_approvers (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          stage_id INTEGER NOT NULL,
+          approver_name TEXT NOT NULL,
+          sort_order INTEGER DEFAULT 0,
+          FOREIGN KEY (stage_id) REFERENCES workflow_stages(id) ON DELETE CASCADE
+        );
+      `);
+    }
+  } catch { /* tables don't exist yet */ }
+
   seedDefaults(db);
 }
 
@@ -332,6 +440,10 @@ function seedDefaults(db: Database.Database) {
     const dispatchTypes = ['报告', '情况说明', '会议纪要', '分局动态', '征求意见稿'];
     const dStmt = db.prepare('INSERT OR IGNORE INTO dispatch_types (name) VALUES (?)');
     dispatchTypes.forEach((t) => dStmt.run(t));
+
+    const appTypes = ['发文申请', '公章申请'];
+    const atStmt = db.prepare('INSERT OR IGNORE INTO application_types (name) VALUES (?)');
+    appTypes.forEach((t) => atStmt.run(t));
   }
 }
 

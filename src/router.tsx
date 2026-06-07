@@ -12,6 +12,9 @@ import ArchivesPage from './pages/archives/ArchivesPage';
 import ArchiveRecordsPage from './pages/archives/ArchiveRecordsPage';
 import BackupPage from './pages/backup/BackupPage';
 import TemplatePage from './pages/templates/TemplatePage';
+import PeriodicPage from './pages/periodic/PeriodicPage';
+import WorkflowPage from './pages/workflow/WorkflowPage';
+import ApplicationPage from './pages/application/ApplicationPage';
 
 export default function Router() {
   return (
@@ -30,6 +33,9 @@ export default function Router() {
         <Route path="/archives/records" element={<ArchiveRecordsPage />} />
         <Route path="/backup" element={<BackupPage />} />
         <Route path="/templates" element={<TemplatePage />} />
+        <Route path="/periodic" element={<PeriodicPage />} />
+        <Route path="/workflow" element={<WorkflowPage />} />
+        <Route path="/applications" element={<ApplicationPage />} />
       </Route>
     </Routes>
   );
