@@ -149,6 +149,7 @@ export default function DashboardPage() {
     {
       title: '标题',
       dataIndex: 'title',
+      width: 400,
       render: (title: string, record: IncomingDoc) => (
         <div
           style={{
@@ -223,7 +224,16 @@ export default function DashboardPage() {
   ];
 
   const meetingColumns: ColumnsType<Meeting> = [
-    { title: '会议主题', dataIndex: 'subject', ellipsis: true },
+    {
+      title: '会议主题',
+      dataIndex: 'subject',
+      width: 400,
+      render: (v: string) => (
+        <div style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {v}
+        </div>
+      ),
+    },
     {
       title: '会议时间',
       dataIndex: 'meeting_time',
@@ -262,6 +272,7 @@ export default function DashboardPage() {
     {
       title: '发文标题',
       dataIndex: 'title',
+      width: 400,
       render: (title: string, record: OutgoingDoc) => (
         <div
           style={{

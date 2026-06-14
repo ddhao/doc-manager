@@ -8,6 +8,8 @@ interface Window {
       get: (sql: string, params?: any[]) => Promise<any>;
       export: () => Promise<{ success: boolean; path?: string }>;
       import: () => Promise<{ success: boolean; error?: string }>;
+      autoBackup: () => Promise<{ success: boolean; path: string }>;
+      openBackupDir: () => Promise<void>;
     };
     clipboard: {
       writeText: (text: string) => Promise<void>;

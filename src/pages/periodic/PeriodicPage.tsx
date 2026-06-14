@@ -19,35 +19,34 @@ export default function PeriodicPage() {
     loadTasks();
   }, []);
 
-  const computeNextReminder = (task: PeriodicTask) => {
+  const computeNextReminder = (task: PeriodicTask): { next: Dayjs | null; inWindow: boolean; daysLeft: number } => {
     const now = dayjs();
     const startDate = dayjs(task.start_date);
-    let next = dayjs().date(task.reminder_day).startOf('day');
 
-    // Ensure next is not before start_date
-    if (next.isBefore(startDate, 'day')) {
-      next = startDate.date(task.reminder_day);
+    let target = dayjs().date(task.reminder_day).startOf('day');
+    if (target.isBefore(startDate, 'day')) {
+      target = startDate.date(task.reminder_day);
     }
 
-    // If next is before or equal to today, try next month
-    if (next.isBefore(now, 'day') || next.isSame(now, 'day')) {
-      next = next.add(1, 'month');
-    }
-
-    // Also ensure we're not before start_date after bumping
-    if (next.isBefore(startDate, 'day')) {
-      next = startDate;
-    }
-
-    // Check end_date
-    if (task.end_date) {
-      const endDate = dayjs(task.end_date);
-      if (next.isAfter(endDate, 'day')) {
-        return null; // No more reminders
+    // If today is past the deadline day, advance to next month
+    if (now.isAfter(target, 'day')) {
+      target = target.add(1, 'month');
+      if (target.isBefore(startDate, 'day')) {
+        target = startDate;
       }
     }
 
-    return next;
+    if (task.end_date) {
+      const endDate = dayjs(task.end_date);
+      if (target.isAfter(endDate, 'day')) {
+        return { next: null, inWindow: false, daysLeft: 0 };
+      }
+    }
+
+    const daysLeft = target.diff(now, 'day');
+    const inWindow = daysLeft <= 5 && daysLeft >= 0;
+
+    return { next: target, inWindow, daysLeft };
   };
 
   const filteredTasks = tasks.filter((t) => {
@@ -87,14 +86,15 @@ export default function PeriodicPage() {
     },
     {
       title: '下次提醒',
-      width: 120,
+      width: 140,
       render: (_: unknown, record: PeriodicTask) => {
         if (record.status === 'completed') return <Tag color="default">已完成</Tag>;
-        const next = computeNextReminder(record);
+        const { next, inWindow, daysLeft } = computeNextReminder(record);
         if (!next) return <Tag color="default">已到期</Tag>;
-        const diff = next.diff(dayjs(), 'day');
-        if (diff === 0) return <Tag color="orange">今天</Tag>;
-        if (diff <= 3) return <Tag color="gold">{next.format('MM-DD')}</Tag>;
+        if (inWindow) {
+          return <Tag color={daysLeft === 0 ? 'red' : 'orange'}>提醒中（剩余{daysLeft}天）</Tag>;
+        }
+        if (daysLeft <= 7) return <Tag color="gold">{next.format('MM-DD')}</Tag>;
         return next.format('MM-DD');
       },
     },

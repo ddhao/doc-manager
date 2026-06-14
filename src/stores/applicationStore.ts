@@ -72,10 +72,12 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
   },
 
   addApp: async (data) => {
+    const firstStage = Math.min(...data.approvals.map((a) => a.stageOrder));
+
     const result = await db.run(
-      `INSERT INTO applications (type_id, title, description, applicant, workflow_template_id, status)
-       VALUES (?, ?, ?, ?, ?, 'processing')`,
-      [data.typeId, data.title, data.description || null, data.applicant || null, data.workflowTemplateId]
+      `INSERT INTO applications (type_id, title, description, applicant, workflow_template_id, status, current_stage_order)
+       VALUES (?, ?, ?, ?, ?, 'processing', ?)`,
+      [data.typeId, data.title, data.description || null, data.applicant || null, data.workflowTemplateId, firstStage]
     );
     const appId = Number(result.lastInsertRowId);
 
@@ -115,13 +117,14 @@ export const useApplicationStore = create<ApplicationState>((set, get) => ({
     if (anyRejected) {
       await db.run("UPDATE applications SET status = 'rejected', updated_at = datetime('now') WHERE id = ?", [appId]);
     } else if (allDone) {
-      const maxStage = Math.max(...approvals.map((a) => a.stage_order), 0);
-      if (currentStage >= maxStage) {
+      const stageOrders = [...new Set(approvals.map((a) => a.stage_order))].sort((a, b) => a - b);
+      const currentIdx = stageOrders.indexOf(currentStage);
+      if (currentIdx < 0 || currentIdx >= stageOrders.length - 1) {
         await db.run("UPDATE applications SET status = 'approved', updated_at = datetime('now') WHERE id = ?", [appId]);
       } else {
         await db.run(
           "UPDATE applications SET current_stage_order = ?, updated_at = datetime('now') WHERE id = ?",
-          [currentStage + 1, appId]
+          [stageOrders[currentIdx + 1], appId]
         );
       }
     }

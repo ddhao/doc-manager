@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Card, Button, Space, message, Typography, Popconfirm } from 'antd';
-import { ExportOutlined, ImportOutlined, WarningOutlined } from '@ant-design/icons';
+import { ExportOutlined, ImportOutlined, WarningOutlined, FolderOpenOutlined } from '@ant-design/icons';
 
 export default function BackupPage() {
   const [exporting, setExporting] = useState(false);
@@ -50,14 +50,22 @@ export default function BackupPage() {
               将当前所有数据导出为数据库文件，可用于数据迁移或备份保存。
             </Typography.Text>
             <div style={{ marginTop: 12 }}>
-              <Button
-                type="primary"
-                icon={<ExportOutlined />}
-                loading={exporting}
-                onClick={handleExport}
-              >
-                导出数据库
-              </Button>
+              <Space>
+                <Button
+                  type="primary"
+                  icon={<ExportOutlined />}
+                  loading={exporting}
+                  onClick={handleExport}
+                >
+                  导出数据库
+                </Button>
+                <Button
+                  icon={<FolderOpenOutlined />}
+                  onClick={() => window.electronAPI.db.openBackupDir()}
+                >
+                  打开备份目录
+                </Button>
+              </Space>
             </div>
           </Card>
 

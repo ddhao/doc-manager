@@ -119,6 +119,7 @@ export default function IncomingPage() {
     {
       title: '标题',
       dataIndex: 'title',
+      width: 400,
       render: (title: string) => {
         return (
           <div
@@ -592,7 +593,7 @@ export default function IncomingPage() {
             disabled: !!record.reply_date || !record.reply_deadline,
           }),
         }}
-        scroll={{ x: 1500, y: 'calc(100vh - 230px)' }}
+        scroll={{ x: 'max-content', y: 'calc(100vh - 230px)' }}
         pagination={{ pageSize: 20, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: (t) => `共 ${t} 条` }}
       />
 

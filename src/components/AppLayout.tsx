@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Modal, Tag, List, Badge, Space } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
@@ -17,7 +17,9 @@ import {
   ClockCircleOutlined,
   ApartmentOutlined,
   FileAddOutlined,
+  BellOutlined,
 } from '@ant-design/icons';
+import { usePeriodicTaskStore, ReminderTask } from '@/stores/periodicTaskStore';
 
 const { Sider, Content, Header } = Layout;
 
@@ -63,8 +65,23 @@ const menuItems: MenuProps['items'] = [
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminders, setReminders] = useState<ReminderTask[]>([]);
   const navigate = useNavigate();
   const location = useLocation();
+  const { loadTasks, getReminderTasks } = usePeriodicTaskStore();
+
+  useEffect(() => {
+    const checkReminders = async () => {
+      await loadTasks();
+      const tasks = getReminderTasks();
+      if (tasks.length > 0) {
+        setReminders(tasks);
+        setReminderOpen(true);
+      }
+    };
+    checkReminders();
+  }, []);
 
   const pathParts = location.pathname.split('/');
   const selectedKey = pathParts.length > 2 ? `/${pathParts[1]}/${pathParts[2]}` : `/${pathParts[1]}`;
@@ -123,6 +140,45 @@ export default function AppLayout() {
           <Outlet />
         </Content>
       </Layout>
+
+      <Modal
+        title={
+          <Space>
+            <BellOutlined style={{ color: '#faad14' }} />
+            <span>定期任务提醒</span>
+            <Badge count={reminders.length} style={{ marginLeft: 8 }} />
+          </Space>
+        }
+        open={reminderOpen}
+        onCancel={() => setReminderOpen(false)}
+        footer={null}
+        width={560}
+      >
+        <List
+          dataSource={reminders}
+          renderItem={(item: ReminderTask) => (
+            <List.Item>
+              <List.Item.Meta
+                title={
+                  <Space>
+                    <span>{item.title}</span>
+                    <Tag color={item.daysLeft === 0 ? 'red' : 'orange'}>
+                      剩余{item.daysLeft}天
+                    </Tag>
+                  </Space>
+                }
+                description={
+                  <div>
+                    <div>截止日期：{item.deadline}（每月{item.reminder_day}日）</div>
+                    {item.description && <div style={{ color: '#999', fontSize: 12, marginTop: 2 }}>{item.description}</div>}
+                  </div>
+                }
+              />
+            </List.Item>
+          )}
+          style={{ maxHeight: 400, overflow: 'auto' }}
+        />
+      </Modal>
     </Layout>
   );
 }

@@ -71,7 +71,7 @@ export default function OutgoingPage() {
     {
       title: '发文标题',
       dataIndex: 'title',
-      width: 300,
+      width: 400,
       render: (title: string, record: OutgoingDoc) => (
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
           {record.level && record.level !== '平' && (

@@ -1,8 +1,8 @@
-import { ipcMain, dialog } from 'electron';
+import { ipcMain, dialog, shell } from 'electron';
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { join } from 'path';
-import { copyFile } from 'fs/promises';
+import { copyFile, mkdir } from 'fs/promises';
 
 let db: Database.Database | null = null;
 
@@ -464,6 +464,29 @@ ipcMain.handle('db:get', (_event, sql: string, params?: any[]) => {
   return database.prepare(sql).get(...(params || []));
 });
 
+ipcMain.handle('db:autoBackup', async () => {
+  const userData = app.getPath('userData');
+  const dbPath = join(userData, 'doc-manager.db');
+  const backupDir = join(userData, 'backups');
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const backupPath = join(backupDir, `auto-backup-${timestamp}.db`);
+
+  await mkdir(backupDir, { recursive: true });
+  const database = getDb();
+  database.pragma('wal_checkpoint(TRUNCATE)');
+  database.close();
+  db = null;
+  await copyFile(dbPath, backupPath);
+  getDb();
+  return { success: true, path: backupPath };
+});
+
+ipcMain.handle('db:openBackupDir', async () => {
+  const backupDir = join(app.getPath('userData'), 'backups');
+  await mkdir(backupDir, { recursive: true });
+  await shell.openPath(backupDir);
+});
+
 ipcMain.handle('db:export', async () => {
   const dbPath = join(app.getPath('userData'), 'doc-manager.db');
   const result = await dialog.showSaveDialog({
@@ -472,6 +495,7 @@ ipcMain.handle('db:export', async () => {
   });
   if (!result.canceled && result.filePath) {
     const database = getDb();
+    database.pragma('wal_checkpoint(TRUNCATE)');
     database.close();
     db = null;
     await copyFile(dbPath, result.filePath);
@@ -503,12 +527,13 @@ ipcMain.handle('db:import', async () => {
 
   // Backup current database before replacing
   const backupPath = `${dbPath}.before-import.bak`;
+  const database = getDb();
+  database.pragma('wal_checkpoint(TRUNCATE)');
+  database.close();
+  db = null;
   await copyFile(dbPath, backupPath);
 
   try {
-    const database = getDb();
-    database.close();
-    db = null;
     await copyFile(sourcePath, dbPath);
     getDb();
     return { success: true };

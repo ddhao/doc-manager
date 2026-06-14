@@ -4,6 +4,7 @@ export const db = {
   run: (sql: string, params?: any[]) => api().db.run(sql, params),
   all: <T = any>(sql: string, params?: any[]) => api().db.all(sql, params) as Promise<T[]>,
   get: <T = any>(sql: string, params?: any[]) => api().db.get(sql, params) as Promise<T>,
+  autoBackup: () => api().db.autoBackup(),
 };
 
 export function copyToClipboard(text: string) {

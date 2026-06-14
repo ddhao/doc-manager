@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get: (sql: string, params?: any[]) => ipcRenderer.invoke('db:get', sql, params),
     export: () => ipcRenderer.invoke('db:export'),
     import: () => ipcRenderer.invoke('db:import'),
+    autoBackup: () => ipcRenderer.invoke('db:autoBackup'),
+    openBackupDir: () => ipcRenderer.invoke('db:openBackupDir'),
   },
   clipboard: {
     writeText: (text: string) => ipcRenderer.invoke('clipboard:write', text),

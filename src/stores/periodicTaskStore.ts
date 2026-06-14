@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import dayjs from 'dayjs';
 import { db } from '@/db';
 
 export interface PeriodicTask {
@@ -13,6 +14,15 @@ export interface PeriodicTask {
   updated_at: string;
 }
 
+export interface ReminderTask {
+  id: number;
+  title: string;
+  description: string | null;
+  reminder_day: number;
+  daysLeft: number;
+  deadline: string;
+}
+
 interface PeriodicTaskState {
   tasks: PeriodicTask[];
   loadTasks: () => Promise<void>;
@@ -20,9 +30,10 @@ interface PeriodicTaskState {
   updateTask: (id: number, data: Partial<PeriodicTask>) => Promise<void>;
   toggleStatus: (id: number) => Promise<void>;
   removeTask: (id: number) => Promise<void>;
+  getReminderTasks: () => ReminderTask[];
 }
 
-export const usePeriodicTaskStore = create<PeriodicTaskState>((set) => ({
+export const usePeriodicTaskStore = create<PeriodicTaskState>((set, get) => ({
   tasks: [],
 
   loadTasks: async () => {
@@ -73,5 +84,43 @@ export const usePeriodicTaskStore = create<PeriodicTaskState>((set) => ({
   removeTask: async (id) => {
     await db.run('DELETE FROM periodic_tasks WHERE id = ?', [id]);
     set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) }));
+  },
+
+  getReminderTasks: () => {
+    const now = dayjs();
+    const result: ReminderTask[] = [];
+    for (const task of get().tasks) {
+      if (task.status !== 'active') continue;
+
+      const startDate = dayjs(task.start_date);
+      let target = dayjs().date(task.reminder_day).startOf('day');
+      if (target.isBefore(startDate, 'day')) {
+        target = startDate.date(task.reminder_day);
+      }
+      if (now.isAfter(target, 'day')) {
+        target = target.add(1, 'month');
+        if (target.isBefore(startDate, 'day')) {
+          target = startDate;
+        }
+      }
+      if (task.end_date) {
+        const endDate = dayjs(task.end_date);
+        if (target.isAfter(endDate, 'day')) continue;
+      }
+
+      const daysLeft = target.diff(now, 'day');
+      if (daysLeft <= 5 && daysLeft >= 0) {
+        result.push({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          reminder_day: task.reminder_day,
+          daysLeft,
+          deadline: target.format('YYYY-MM-DD'),
+        });
+      }
+    }
+    result.sort((a, b) => a.daysLeft - b.daysLeft);
+    return result;
   },
 }));

@@ -238,6 +238,8 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   },
 
   importFromExcel: async (data: ArrayBuffer, importYear?: number) => {
+    await db.autoBackup();
+
     const wb = XLSX.read(data, { type: 'array' });
     const sheetName = wb.SheetNames[0];
     const sheet = wb.Sheets[sheetName];

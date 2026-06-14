@@ -263,6 +263,8 @@ export const useIncomingStore = create<IncomingState>((set) => ({
   },
 
   importFromExcel: async (data: ArrayBuffer) => {
+    await db.autoBackup();
+
     const wb = XLSX.read(data, { type: 'array' });
     const sheetName = wb.SheetNames[0]; // '收文' sheet
     const sheet = wb.Sheets[sheetName];

@@ -189,16 +189,19 @@ export default function ApplicationPage() {
           expandedRowRender: (record: Application) => {
             const approvals = record.approvals || [];
             const currentStage = record.current_stage_order;
+            const stageOrders = [...new Set(approvals.map((a) => a.stage_order))].sort((a, b) => a - b);
+            const currentStageIdx = stageOrders.indexOf(currentStage);
 
             return (
-              <div style={{ padding: 8 }}>
+              <div style={{ padding: 0 }}>
                 <Steps
                   size="small"
-                  current={record.status === 'approved' ? approvals.length : record.status === 'rejected' ? -1 : currentStage}
+                  current={record.status === 'approved' ? stageOrders.length : record.status === 'rejected' ? -1 : currentStageIdx}
                   status={record.status === 'rejected' ? 'error' : record.status === 'approved' ? 'finish' : 'process'}
-                  items={[...new Map(approvals.map((a) => [a.stage_order, a.stage_name])).entries()]
-                    .sort(([a], [b]) => a - b)
-                    .map(([order, name]) => ({ title: name }))}
+                  items={stageOrders.map((order) => {
+                    const name = approvals.find((a) => a.stage_order === order)?.stage_name || '';
+                    return { title: name };
+                  })}
                   style={{ marginBottom: 16 }}
                 />
 
