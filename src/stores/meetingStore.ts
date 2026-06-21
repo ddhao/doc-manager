@@ -231,6 +231,7 @@ export const useMeetingStore = create<MeetingState>((set) => ({
   },
 
   clearAll: async () => {
+    await db.autoBackup();
     await db.run('DELETE FROM meeting_files');
     await db.run('DELETE FROM meeting_attendees');
     await db.run('DELETE FROM meetings');

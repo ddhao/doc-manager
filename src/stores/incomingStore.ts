@@ -103,7 +103,7 @@ async function loadDocDepartments(docIds: number[]): Promise<Map<number, DocDepa
   return map;
 }
 
-export const useIncomingStore = create<IncomingState>((set) => ({
+export const useIncomingStore = create<IncomingState>((set, get) => ({
   docs: [],
   files: [],
   loading: false,
@@ -207,6 +207,14 @@ export const useIncomingStore = create<IncomingState>((set) => ({
         vals.push(data[f]);
       }
     }
+    if (data.reply_deadline !== undefined) {
+      const cur = get().docs.find((d) => d.id === id);
+      if (cur && cur.status === 'done' && !cur.reply_deadline && data.reply_deadline) {
+        sets.push('status = ?');
+        vals.push('pending');
+      }
+    }
+
     if (sets.length) {
       await db.run(
         `UPDATE incoming_docs SET ${sets.join(', ')}, updated_at = datetime('now') WHERE id = ?`,
@@ -224,7 +232,24 @@ export const useIncomingStore = create<IncomingState>((set) => ({
       }
     }
 
-    await useIncomingStore.getState().loadDocs();
+    const [rows, deptMap] = await Promise.all([
+      db.all<IncomingDoc>(
+        `SELECT i.*, u.name as send_unit_name
+         FROM incoming_docs i
+         LEFT JOIN units u ON i.send_unit_id = u.id
+         WHERE i.id = ?`,
+        [id]
+      ),
+      loadDocDepartments([id]),
+    ]);
+
+    if (rows.length > 0) {
+      const doc = rows[0];
+      doc.departments = deptMap.get(id) || [];
+      set((s) => ({
+        docs: s.docs.map((d) => (d.id === id ? doc : d)),
+      }));
+    }
   },
 
   removeDoc: async (id) => {
@@ -256,6 +281,7 @@ export const useIncomingStore = create<IncomingState>((set) => ({
   },
 
   clearAll: async () => {
+    await db.autoBackup();
     await db.run('DELETE FROM incoming_doc_departments');
     await db.run('DELETE FROM incoming_files');
     await db.run('DELETE FROM incoming_docs');

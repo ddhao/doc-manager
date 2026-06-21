@@ -509,9 +509,14 @@ export default function IncomingPage() {
           icon={<PlusOutlined />}
           onClick={async () => {
             setEditing(null);
-            const approvalNumber = await useIncomingStore.getState().generateApprovalNumber();
             form.resetFields();
             setDeptAssignments([]);
+            let approvalNumber = '';
+            try {
+              approvalNumber = await useIncomingStore.getState().generateApprovalNumber();
+            } catch {
+              // fallback: leave approval number empty, user can fill manually
+            }
             form.setFieldsValue({
               document_type: '镇府公文',
               approval_number: approvalNumber,

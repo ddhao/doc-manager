@@ -137,7 +137,18 @@ export const useOutgoingStore = create<OutgoingState>((set) => ({
       }
     }
 
-    await useOutgoingStore.getState().loadDocs();
+    const [rows, unitMap] = await Promise.all([
+      db.all<OutgoingDoc>('SELECT * FROM outgoing_docs WHERE id = ?', [id]),
+      loadDocUnits([id]),
+    ]);
+
+    if (rows.length > 0) {
+      const doc = rows[0];
+      doc.units = unitMap.get(id) || [];
+      set((s) => ({
+        docs: s.docs.map((d) => (d.id === id ? doc : d)),
+      }));
+    }
   },
 
   updateDocStatus: async (id, status) => {

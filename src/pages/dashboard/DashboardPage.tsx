@@ -46,38 +46,38 @@ export default function DashboardPage() {
   const today = dayjs().startOf('day');
 
   // Incoming
-  const needReplyDocs = useMemo(() => {
-    return incomingDocs.filter((d) => d.status !== 'done' && d.reply_deadline);
+  const activeIncomingDocs = useMemo(() => {
+    return incomingDocs.filter((d) => d.status !== 'done');
   }, [incomingDocs]);
 
+  const needReplyDocs = useMemo(() => {
+    return activeIncomingDocs.filter((d) => d.reply_deadline);
+  }, [activeIncomingDocs]);
+
   const stats = useMemo(() => {
-    const total = needReplyDocs.length;
-    const overdue = needReplyDocs.filter((d) => {
-      if (!d.reply_deadline) return false;
-      return dayjs(d.reply_deadline).isBefore(today, 'day');
-    }).length;
+    const total = activeIncomingDocs.length;
+    const overdue = needReplyDocs.filter((d) =>
+      dayjs(d.reply_deadline).isBefore(today, 'day')
+    ).length;
     const dueSoon = needReplyDocs.filter((d) => {
-      if (!d.reply_deadline) return false;
       const dl = dayjs(d.reply_deadline);
       return dl.diff(today, 'day') >= 0 && dl.diff(today, 'day') <= 2;
     }).length;
     return { total, overdue, dueSoon };
-  }, [needReplyDocs]);
+  }, [activeIncomingDocs, needReplyDocs]);
 
   const filteredDocs = useMemo(() => {
-    const overdueDocs = needReplyDocs.filter((d) => {
-      if (!d.reply_deadline) return false;
-      return dayjs(d.reply_deadline).isBefore(today, 'day');
-    });
-    const dueSoonDocs = needReplyDocs.filter((d) => {
-      if (!d.reply_deadline) return false;
-      const dl = dayjs(d.reply_deadline);
-      return dl.diff(today, 'day') >= 0 && dl.diff(today, 'day') <= 2;
-    });
-    if (activeFilter === 'overdue') return overdueDocs;
-    if (activeFilter === 'dueSoon') return dueSoonDocs;
-    return needReplyDocs;
-  }, [needReplyDocs, activeFilter]);
+    if (activeFilter === 'overdue') {
+      return needReplyDocs.filter((d) => dayjs(d.reply_deadline).isBefore(today, 'day'));
+    }
+    if (activeFilter === 'dueSoon') {
+      return needReplyDocs.filter((d) => {
+        const dl = dayjs(d.reply_deadline);
+        return dl.diff(today, 'day') >= 0 && dl.diff(today, 'day') <= 2;
+      });
+    }
+    return activeIncomingDocs;
+  }, [activeIncomingDocs, needReplyDocs, activeFilter]);
 
   // Outgoing
   const needReplyOutgoing = useMemo(() => {
@@ -362,7 +362,7 @@ export default function DashboardPage() {
       </Row>
       <Card
         size="small"
-        title={activeFilter === 'overdue' ? '已逾期的收文' : activeFilter === 'dueSoon' ? '近2日到期的收文' : '需要回复的收文'}
+        title={activeFilter === 'overdue' ? '已逾期的收文' : activeFilter === 'dueSoon' ? '近2日到期的收文' : '全部收文'}
         extra={
           <Select allowClear placeholder="按股室筛选" style={{ width: 180 }} value={filterDept} onChange={(v) => setFilterDept(v)}>
             {departments.map((d) => (
