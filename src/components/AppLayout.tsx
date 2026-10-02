@@ -5,18 +5,13 @@ import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
   InboxOutlined,
-  SendOutlined,
-  CalendarOutlined,
   BankOutlined,
   TeamOutlined,
   ContactsOutlined,
   SettingOutlined,
-  FolderOpenOutlined,
   CloudServerOutlined,
   FileTextOutlined,
   ClockCircleOutlined,
-  ApartmentOutlined,
-  FileAddOutlined,
   BellOutlined,
 } from '@ant-design/icons';
 import { usePeriodicTaskStore, ReminderTask } from '@/stores/periodicTaskStore';
@@ -45,22 +40,17 @@ const menuItems: MenuProps['items'] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
   { type: 'divider' },
   { key: '/incoming', icon: <InboxOutlined />, label: '收文管理' },
-  { key: '/outgoing', icon: <SendOutlined />, label: '发文管理' },
-  { key: '/meetings', icon: <CalendarOutlined />, label: '会议管理' },
   { type: 'divider' },
   { key: '/units', icon: <BankOutlined />, label: '单位管理' },
   { key: '/departments', icon: <TeamOutlined />, label: '股室管理' },
   { key: '/contacts', icon: <ContactsOutlined />, label: '通讯录' },
   { type: 'divider' },
-  { key: '/archives', icon: <FolderOpenOutlined />, label: '档案管理' },
   { key: '/config', icon: <SettingOutlined />, label: '基本配置' },
   { key: '/backup', icon: <CloudServerOutlined />, label: '备份管理' },
   { type: 'divider' },
   { key: '/templates', icon: <FileTextOutlined />, label: '模版管理' },
   { type: 'divider' },
   { key: '/periodic', icon: <ClockCircleOutlined />, label: '定期任务' },
-  { key: '/workflow', icon: <ApartmentOutlined />, label: '流程管理' },
-  { key: '/applications', icon: <FileAddOutlined />, label: '申请管理' },
 ];
 
 export default function AppLayout() {
