@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   Table, Button, Space, Modal, Form, Input, Select, DatePicker, Tag, Popconfirm,
-  Upload, message, Dropdown, Row, Col, Typography,
+  Upload, message, Row, Col, Typography, AutoComplete,
 } from 'antd';
 import {
   PlusOutlined, CopyOutlined, EditOutlined,
-  DeleteOutlined, FileTextOutlined, MoreOutlined, SearchOutlined, ImportOutlined, ExportOutlined,
+  DeleteOutlined, FileTextOutlined, SearchOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
@@ -14,8 +15,10 @@ import PizZip from 'pizzip';
 import { useIncomingStore, IncomingDoc, IncomingFile, DocDepartment, roleLabels } from '@/stores/incomingStore';
 import { useUnitStore } from '@/stores/unitStore';
 import { useConfigStore } from '@/stores/configStore';
+import { useHandlerStore } from '@/stores/handlerStore';
 import { useArchiveStore } from '@/stores/archiveStore';
 import { copyToClipboard, db } from '@/db';
+import { parseIncomingText, stripTrailingPeriod } from '@/utils/incomingTextParser';
 
 const statusMap: Record<string, { color: string; text: string }> = {
   pending: { color: 'blue', text: '待处理' },
@@ -46,9 +49,10 @@ type DeptAssignment = { department_id: number; role: string };
 export default function IncomingPage() {
   const { docs, files, loadDocs, addDoc, updateDoc, removeDoc, updateDocStatus, batchReply, clearAll, importFromExcel, exportToExcel, loadFiles, addFile, removeFile } =
     useIncomingStore();
-  const { units, loadUnits } = useUnitStore();
+  const { units, loadUnits, addUnit } = useUnitStore();
   const { departments, loadDepartments } = useUnitStore();
   const { docTypes, tags, levels, loadDocTypes, loadTags, loadLevels } = useConfigStore();
+  const { handlers, currentHandler, defaultHandler, loadHandlers } = useHandlerStore();
   const { loading } = useIncomingStore();
 
   const [formOpen, setFormOpen] = useState(false);
@@ -73,6 +77,8 @@ export default function IncomingPage() {
   const [filterStatus, setFilterStatus] = useState<string | undefined>();
   const [clearPwdOpen, setClearPwdOpen] = useState(false);
   const [clearPwd, setClearPwd] = useState('');
+  const [parseOpen, setParseOpen] = useState(false);
+  const [parseText, setParseText] = useState('');
 
   const loadArchivedIds = async () => {
     const rows = await db.all<{ doc_id: number }>(
@@ -90,6 +96,7 @@ export default function IncomingPage() {
     );
     loadUnits();
     loadDepartments();
+    loadHandlers();
     loadDocTypes();
     loadTags();
     loadLevels();
@@ -115,7 +122,6 @@ export default function IncomingPage() {
   const getDeptName = (deptId: number) => departments.find((d) => d.id === deptId)?.name || '';
 
   const columns: ColumnsType<IncomingDoc> = [
-    { title: '呈批编号', dataIndex: 'approval_number', width: 120, render: (v) => v || '-' },
     {
       title: '标题',
       dataIndex: 'title',
@@ -147,24 +153,6 @@ export default function IncomingPage() {
         );
       },
     },
-    {
-      title: '标签',
-      dataIndex: 'document_tag',
-      width: 120,
-      render: (_tag: string, record: IncomingDoc) => {
-        const levelColorMap: Record<string, string> = {
-          '特急': 'red', '加急': 'orange', '急': 'gold',
-        };
-        return (
-          <Space size={4} wrap>
-            {record.level && record.level !== '平' && (
-              <Tag color={levelColorMap[record.level] || 'default'}>{record.level}</Tag>
-            )}
-            {record.document_tag && <Tag color="cyan">{record.document_tag}</Tag>}
-          </Space>
-        );
-      },
-    },
     { title: '来文单位', dataIndex: 'send_unit_name', width: 140, render: (v) => v || '-' },
     {
       title: '转发股室',
@@ -186,12 +174,6 @@ export default function IncomingPage() {
       title: '回文日期',
       dataIndex: 'reply_date',
       width: 160,
-      render: (v) => v || '-',
-    },
-    {
-      title: '备注',
-      dataIndex: 'notes',
-      width: 200,
       render: (v) => v || '-',
     },
     {
@@ -217,7 +199,7 @@ export default function IncomingPage() {
     },
     {
       title: '操作',
-      width: 240,
+      width: 280,
       fixed: 'right' as const,
       render: (_, record) => {
         const isArchived = archivedDocIds.has(record.id);
@@ -226,34 +208,14 @@ export default function IncomingPage() {
           <Button size="small" icon={<EditOutlined />} disabled={isArchived} onClick={() => openEdit(record)}>
             编辑
           </Button>
-          <Button size="small" icon={<CopyOutlined />} onClick={() => copyForwardText(record)}>
-            转发
+          <Button size="small" icon={<FileTextOutlined />} disabled={generatingId === record.id} onClick={() => generateApprovalDocx(record)}>
+            生成呈批表
           </Button>
-          <Dropdown
-            menu={{
-              items: [
-                ...(record.status === 'done' && !isArchived
-                  ? [{ key: 'archive', label: '归档', icon: <FileTextOutlined />, onClick: () => openArchive(record) }]
-                  : []),
-                ...(isArchived
-                  ? [{ key: 'archived', label: '已归档', icon: <FileTextOutlined />, disabled: true }]
-                  : []),
-                { key: 'files', label: '关联文件', icon: <FileTextOutlined />, onClick: () => openFiles(record.id) },
-                {
-                  key: 'generate', label: '生成呈批表', icon: <FileTextOutlined />,
-                  disabled: generatingId === record.id,
-                  onClick: () => generateApprovalDocx(record),
-                },
-                { type: 'divider' as const },
-                {
-                  key: 'delete', label: '删除', danger: true, icon: <DeleteOutlined />,
-                  onClick: () => { removeDoc(record.id); message.success('已删除'); },
-                },
-              ],
-            }}
-          >
-            <Button size="small" icon={<MoreOutlined />} />
-          </Dropdown>
+          <Popconfirm title="确定删除该收文？" onConfirm={() => { removeDoc(record.id); message.success('已删除'); }}>
+            <Button size="small" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
         </Space>
         );},
     },
@@ -280,11 +242,96 @@ export default function IncomingPage() {
     setFileVisible(true);
   };
 
+  const openNewForm = async (
+    prefill?: { title?: string | null; send_unit_id?: number | null; reply_deadline?: string | null; summary?: string | null },
+    initialAssignments: DeptAssignment[] = []
+  ) => {
+    setEditing(null);
+    form.resetFields();
+    setDeptAssignments(initialAssignments);
+    let approvalNumber = '';
+    try {
+      approvalNumber = await useIncomingStore.getState().generateApprovalNumber();
+    } catch {
+      // fallback: leave approval number empty, user can fill manually
+    }
+    form.setFieldsValue({
+      document_type: '镇府公文',
+      approval_number: approvalNumber,
+      handler: currentHandler || defaultHandler || handlers[0]?.name || '刘浩',
+      title: prefill?.title || undefined,
+      summary: prefill?.summary || undefined,
+      send_unit_id: prefill?.send_unit_id ?? undefined,
+      reply_deadline: prefill?.reply_deadline ? dayjs(prefill.reply_deadline) : null,
+    });
+    setFormOpen(true);
+  };
+
+  const handleParseSubmit = async () => {
+    const text = parseText.trim();
+    if (!text) {
+      message.warning('请先粘贴需要识别的文字');
+      return;
+    }
+    const result = parseIncomingText(text, units, departments);
+
+    let sendUnitId = result.send_unit_id;
+    let sendUnitName = result.send_unit_name;
+    if (sendUnitId === null && result.unitCandidate) {
+      const candidate = result.unitCandidate;
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Modal.confirm({
+          title: '未找到匹配的来文单位',
+          content: `是否新增单位「${candidate}」？`,
+          okText: '新增并填入',
+          cancelText: '不新增',
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false),
+        });
+      });
+      if (confirmed) {
+        try {
+          await addUnit(candidate);
+          const created = useUnitStore.getState().units.find((u) => u.name === candidate);
+          if (created) {
+            sendUnitId = created.id;
+            sendUnitName = created.name;
+          } else {
+            message.warning('单位已新增，请在表单中手动选择');
+          }
+        } catch {
+          message.error('新增单位失败，请在表单中手动选择');
+        }
+      }
+    }
+
+    setParseOpen(false);
+    setParseText('');
+    await openNewForm(
+      {
+        title: result.title,
+        send_unit_id: sendUnitId,
+        reply_deadline: result.reply_deadline,
+        summary: result.summary,
+      },
+      result.assignments.map((a) => ({ department_id: a.department_id, role: a.role }))
+    );
+
+    const parts: string[] = [];
+    if (sendUnitName) parts.push(`单位「${sendUnitName}」`);
+    if (result.assignments.length > 0) parts.push(`股室 ${result.assignments.length} 个`);
+    if (result.reply_deadline) parts.push(`回复日期 ${result.reply_deadline}`);
+    if (parts.length > 0) message.success(`已识别：${parts.join('，')}`);
+    if (result.warnings.length > 0) message.warning(`未识别到：${result.warnings.join('、')}`);
+  };
+
   const handleSubmit = async () => {
     const values = await form.validateFields();
     const data = {
       ...values,
       reply_deadline: values.reply_deadline ? values.reply_deadline.format('YYYY-MM-DD') : null,
+      // 摘要结尾的句号去掉
+      summary: typeof values.summary === 'string' ? stripTrailingPeriod(values.summary) : values.summary,
     };
     if (editing) {
       await updateDoc(editing.id, data, deptAssignments);
@@ -446,7 +493,10 @@ export default function IncomingPage() {
         }
       }
     }
-    return parts.join('，');
+    // 「办公室协办」这类要排在各个股室后面
+    const officeParts = parts.filter((p) => p.includes('办公室'));
+    const otherParts = parts.filter((p) => !p.includes('办公室'));
+    return [...otherParts, ...officeParts].join('，');
   };
 
   const formatReplyDate = (dateStr: string | null): string => {
@@ -507,25 +557,18 @@ export default function IncomingPage() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={async () => {
-            setEditing(null);
-            form.resetFields();
-            setDeptAssignments([]);
-            let approvalNumber = '';
-            try {
-              approvalNumber = await useIncomingStore.getState().generateApprovalNumber();
-            } catch {
-              // fallback: leave approval number empty, user can fill manually
-            }
-            form.setFieldsValue({
-              document_type: '镇府公文',
-              approval_number: approvalNumber,
-              handler: '刘浩',
-            });
-            setFormOpen(true);
-          }}
+          onClick={() => { void openNewForm(); }}
         >
           收文登记
+        </Button>
+        <Button
+          icon={<FileSearchOutlined />}
+          onClick={() => {
+            setParseText('');
+            setParseOpen(true);
+          }}
+        >
+          智能登记
         </Button>
         <Input.Search
           placeholder="搜索标题/来文单位"
@@ -564,11 +607,6 @@ export default function IncomingPage() {
             </Select.Option>
           ))}
         </Select>
-        <Button icon={<ImportOutlined />} onClick={handleImport}>导入</Button>
-        <Button icon={<ExportOutlined />} onClick={handleExport}>导出</Button>
-        <Button danger icon={<DeleteOutlined />} onClick={() => { setClearPwd(''); setClearPwdOpen(true); }}>
-          清除数据
-        </Button>
         {selectedRowKeys.length > 0 && (
           <Popconfirm
             title={`确定将选中的 ${selectedRowKeys.length} 条记录标记为已办结？回文时间将为当前时间。`}
@@ -603,6 +641,29 @@ export default function IncomingPage() {
       />
 
       <Modal
+        title="智能登记"
+        open={parseOpen}
+        onOk={handleParseSubmit}
+        okText="识别并填入"
+        cancelText="取消"
+        onCancel={() => { setParseOpen(false); setParseText(''); }}
+        width={720}
+      >
+        <Input.TextArea
+          rows={8}
+          value={parseText}
+          onChange={(e) => setParseText(e.target.value)}
+          placeholder={
+            '粘贴公文文字，例如：\n' +
+            '（生态环境局谢岗分局）【关于征求《…》意见的函】转各股室阅办，办公室协办，于9月30日回复。@黄浩明 @李伟杰'
+          }
+        />
+        <div style={{ color: '#999', fontSize: 12, marginTop: 8 }}>
+          将自动识别来文单位、转发股室、标题、回复日期与摘要；未匹配到的单位会询问是否新增。识别结果可在登记表单中修改。
+        </div>
+      </Modal>
+
+      <Modal
         title={editing ? '编辑收文' : '收文登记'}
         open={formOpen}
         onOk={handleSubmit}
@@ -615,7 +676,7 @@ export default function IncomingPage() {
           </Form.Item>
           <Row gutter={16}>
             <Col span={8}>
-              <Form.Item name="level" label="公文等级">
+              <Form.Item name="level" label="公文等级" hidden>
                 <Select allowClear placeholder="选择等级">
                   {levels.map((l) => (
                     <Select.Option key={l.id} value={l.name}>{l.name}</Select.Option>
@@ -624,7 +685,7 @@ export default function IncomingPage() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="document_type" label="公文类型">
+              <Form.Item name="document_type" label="公文类型" hidden>
                 <Select allowClear placeholder="选择公文类型">
                   {docTypes.map((t) => (
                     <Select.Option key={t.id} value={t.name}>{t.name}</Select.Option>
@@ -633,7 +694,7 @@ export default function IncomingPage() {
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="document_tag" label="公文标签">
+              <Form.Item name="document_tag" label="公文标签" hidden>
                 <Select allowClear placeholder="选择公文标签">
                   {tags.map((t) => (
                     <Select.Option key={t.id} value={t.name}>{t.name}</Select.Option>
@@ -643,7 +704,7 @@ export default function IncomingPage() {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={24}>
               <Form.Item name="send_unit_id" label="来文单位">
                 <Select allowClear showSearch placeholder="选择来文单位"
                   filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
@@ -655,12 +716,12 @@ export default function IncomingPage() {
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="document_number" label="来文字号">
+              <Form.Item name="document_number" label="来文字号" hidden>
                 <Input />
               </Form.Item>
             </Col>
             <Col span={6}>
-              <Form.Item name="security_level" label="密级">
+              <Form.Item name="security_level" label="密级" hidden>
                 <Select allowClear placeholder="选择密级">
                   <Select.Option value="绝密">绝密</Select.Option>
                   <Select.Option value="机密">机密</Select.Option>
@@ -671,18 +732,25 @@ export default function IncomingPage() {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item name="approval_number" label="呈批编号">
                 <Input />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item name="handler" label="经办人">
-                <Input />
+                <AutoComplete
+                  allowClear
+                  placeholder="选择或输入经办人"
+                  options={handlers.map((h) => ({ value: h.name }))}
+                  filterOption={(input, option) =>
+                    String(option?.value ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="reviewer" label="审核人">
+              <Form.Item name="reviewer" label="审核人" hidden>
                 <Input />
               </Form.Item>
             </Col>
@@ -722,16 +790,35 @@ export default function IncomingPage() {
                 size="small"
                 type="link"
                 onClick={() => {
+                  const isOfficeDept = (id: number) => getDeptName(id).includes('办公室');
                   const existing = new Set(deptAssignments.map((a) => a.department_id));
-                  const newAssignments = departments
+                  const added = departments
                     .filter((d) => !existing.has(d.id))
-                    .map((d) => ({ department_id: d.id, role: 'read_handle' as const }));
-                  if (newAssignments.length === 0) {
+                    .map((d) => ({
+                      department_id: d.id,
+                      role: (d.name.includes('办公室') ? 'assist' : 'read_handle') as string,
+                    }));
+                  // 办公室统一按协办，并排到最后
+                  const merged = [...deptAssignments, ...added].map((a) =>
+                    a.role === 'read_handle' && isOfficeDept(a.department_id) ? { ...a, role: 'assist' } : a
+                  );
+                  const offices = merged.filter((a) => isOfficeDept(a.department_id));
+                  const others = merged.filter((a) => !isOfficeDept(a.department_id));
+                  const next = [...others, ...offices];
+                  const officeRoleChanged = deptAssignments.some(
+                    (a) => a.role === 'read_handle' && isOfficeDept(a.department_id)
+                  );
+                  if (added.length === 0 && !officeRoleChanged) {
                     message.info('所有股室已添加');
                     return;
                   }
-                  setDeptAssignments([...deptAssignments, ...newAssignments]);
-                  message.success(`已添加 ${newAssignments.length} 个股室为阅办`);
+                  setDeptAssignments(next);
+                  const officeAdded = added.filter((a) => a.role === 'assist').length;
+                  message.success(
+                    added.length > 0
+                      ? `已添加 ${added.length} 个股室${officeAdded > 0 ? '，办公室设为协办' : ''}`
+                      : '办公室已改为协办'
+                  );
                 }}
               >
                 一键转各股室阅办
@@ -776,6 +863,18 @@ export default function IncomingPage() {
               >
                 办公室汇总
               </Button>
+              <Button
+                size="small"
+                type="link"
+                danger
+                disabled={deptAssignments.length === 0}
+                onClick={() => {
+                  setDeptAssignments([]);
+                  message.success('已移除全部转发股室');
+                }}
+              >
+                一键移除
+              </Button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, minHeight: 28 }}>
               {deptAssignments.map((a) => (
@@ -796,7 +895,7 @@ export default function IncomingPage() {
           <Form.Item name="reply_deadline" label="回复日期">
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="notes" label="备注">
+          <Form.Item name="notes" label="备注" hidden>
             <Input.TextArea rows={3} />
           </Form.Item>
           <Form.Item name="summary" label="摘要">

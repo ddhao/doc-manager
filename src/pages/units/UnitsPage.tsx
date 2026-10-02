@@ -38,10 +38,31 @@ export default function UnitsPage() {
           type="primary"
           icon={<PlusOutlined />}
           onClick={async () => {
-            if (!name.trim()) return;
-            await addUnit(name.trim());
-            setName('');
-            message.success('添加成功');
+            const value = name.trim();
+            if (!value) {
+              message.warning('请输入单位名称');
+              return;
+            }
+            try {
+              await addUnit(value);
+              setName('');
+              message.success('添加成功');
+            } catch (e: any) {
+              // 去掉 Electron IPC 包装，只保留数据库原始错误
+              const reason = String(e?.message || e)
+                .replace(/^Error invoking remote method '[^']*':\s*/, '')
+                .replace(/^Error:\s*/, '')
+                .trim();
+              if (reason.includes('UNIQUE')) {
+                message.error(`新增失败：单位「${value}」已存在`);
+              } else if (reason.includes('NOT NULL')) {
+                message.error('新增失败：单位名称不能为空');
+              } else if (reason.includes('no such table')) {
+                message.error('新增失败：数据表不存在，请重启程序后再试');
+              } else {
+                message.error(`新增失败：${reason}`);
+              }
+            }
           }}
         >
           新增单位

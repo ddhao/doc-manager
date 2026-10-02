@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   file: {
     openFile: (options?: { filters?: { name: string; extensions: string[] }[] }) =>
       ipcRenderer.invoke('file:openFile', options),
+    openFiles: (options?: { filters?: { name: string; extensions: string[] }[] }) =>
+      ipcRenderer.invoke('file:openFiles', options),
     saveFile: (data: ArrayBuffer, options?: { defaultName?: string; filters?: { name: string; extensions: string[] }[] }) =>
       ipcRenderer.invoke('file:save', data, options),
     saveTemp: (data: ArrayBuffer, filename: string) => ipcRenderer.invoke('file:saveTemp', data, filename),

@@ -183,6 +183,40 @@ function initTables(db: Database.Database) {
       value TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS handlers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS work_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_no TEXT,
+      accept_time TEXT,
+      deadline TEXT,
+      citizen_name TEXT,
+      contact_phone TEXT,
+      caller_phone TEXT,
+      title TEXT,
+      subject TEXT,
+      location TEXT,
+      form_content TEXT,
+      appeal TEXT,
+      source TEXT,
+      urgency TEXT,
+      order_type TEXT,
+      accept_dept TEXT,
+      category TEXT,
+      business_point TEXT,
+      status TEXT DEFAULT 'processing',
+      is_duplicate INTEGER DEFAULT 0,
+      duplicate_ref_id INTEGER,
+      created_at TEXT DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS periodic_tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
@@ -384,6 +418,8 @@ function initTables(db: Database.Database) {
   try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN security_level TEXT`); } catch { /* exists */ }
   try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN handler TEXT`); } catch { /* exists */ }
   try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN reviewer TEXT`); } catch { /* exists */ }
+  // Migration: 关联工单（工单管理生成的收文）
+  try { db.exec(`ALTER TABLE incoming_docs ADD COLUMN work_order_id INTEGER`); } catch { /* exists */ }
 
   // Migration: workflow_stages schema v2 — replace stage_type enum with user-defined name + has_approvers flag
   try {
@@ -424,6 +460,21 @@ function initTables(db: Database.Database) {
   } catch { /* tables don't exist yet */ }
 
   seedDefaults(db);
+
+  // Migration: 工单登记时间改为本地时区（历史数据是 UTC，换算一次）
+  try {
+    const done = db
+      .prepare("SELECT value FROM config WHERE key = 'migration_work_orders_localtime'")
+      .get() as any;
+    if (!done) {
+      db.prepare(
+        "UPDATE work_orders SET created_at = datetime(created_at, 'localtime'), updated_at = datetime(updated_at, 'localtime')"
+      ).run();
+      db.prepare(
+        "INSERT OR REPLACE INTO config (key, value) VALUES ('migration_work_orders_localtime', '1')"
+      ).run();
+    }
+  } catch { /* work_orders 尚未创建时忽略 */ }
 }
 
 function seedDefaults(db: Database.Database) {
@@ -444,6 +495,17 @@ function seedDefaults(db: Database.Database) {
     const appTypes = ['发文申请', '公章申请'];
     const atStmt = db.prepare('INSERT OR IGNORE INTO application_types (name) VALUES (?)');
     appTypes.forEach((t) => atStmt.run(t));
+  }
+
+  // 经办人：首次运行时用已有收文里出现过的经办人初始化，避免下拉为空
+  const handlerCount = db.prepare('SELECT COUNT(*) as cnt FROM handlers').get() as any;
+  if (handlerCount.cnt === 0) {
+    const rows = db.prepare(
+      "SELECT DISTINCT handler FROM incoming_docs WHERE handler IS NOT NULL AND TRIM(handler) != '' ORDER BY handler"
+    ).all() as { handler: string }[];
+    const insert = db.prepare('INSERT OR IGNORE INTO handlers (name, sort_order) VALUES (?, ?)');
+    rows.forEach((r, i) => insert.run(r.handler.trim(), i));
+    if (rows.length === 0) insert.run('刘浩', 0);
   }
 }
 

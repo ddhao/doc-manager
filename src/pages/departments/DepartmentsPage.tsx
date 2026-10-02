@@ -99,10 +99,10 @@ export default function DepartmentsPage() {
           <Form.Item name="sort_order" label="排序">
             <InputNumber style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="leader" label="负责人">
+          <Form.Item name="leader" label="负责人" hidden>
             <Input />
           </Form.Item>
-          <Form.Item name="receiver" label="收文员">
+          <Form.Item name="receiver" label="收文员" hidden>
             <Select mode="multiple" allowClear placeholder="选择收文员">
               {contacts.map((c) => (
                 <Select.Option key={c.id} value={c.name}>{c.name}</Select.Option>

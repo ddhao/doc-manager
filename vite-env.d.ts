@@ -19,6 +19,7 @@ interface Window {
     };
     file: {
       openFile: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePath: string; data: ArrayBuffer } | null>;
+      openFiles: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<{ filePath: string; data: ArrayBuffer }[]>;
       saveFile: (data: ArrayBuffer, options?: { defaultName?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
       saveTemp: (data: ArrayBuffer, filename: string) => Promise<string>;
     };

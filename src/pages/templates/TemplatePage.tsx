@@ -60,34 +60,6 @@ export default function TemplatePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card size="small" title="转发模版">
-        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-          可用变量：{`{{来文单位}} {{标题}} {{转发股室}} {{收文员}} {{呈批编号}} {{回复日期}} {{公文类型}} {{公文标签}} {{摘要}}`}
-        </Typography.Text>
-        <Input.TextArea
-          rows={8}
-          value={forwardTemplate}
-          onChange={(e) => setForwardTemplate(e.target.value)}
-          style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 12 }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Space wrap>
-            {['来文单位', '标题', '转发股室', '收文员', '呈批编号', '回复日期', '公文类型', '公文标签', '摘要'].map((v) => (
-              <Button
-                key={v}
-                size="small"
-                onClick={() => setForwardTemplate(forwardTemplate + `{{${v}}}`)}
-              >
-                {v}
-              </Button>
-            ))}
-          </Space>
-          <Button type="primary" icon={<EditOutlined />} onClick={saveForwardTemplate}>
-            保存模版
-          </Button>
-        </div>
-      </Card>
-
       <Card size="small" title="呈批表模版">
         <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
           上传 Word (.docx) 格式的呈批表模版，用于生成呈批表。模版中可用变量与呈批表中的字段对应。

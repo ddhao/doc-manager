@@ -73,6 +73,20 @@ ipcMain.handle('file:openFile', async (_event, options?: { filters?: { name: str
   return null;
 });
 
+ipcMain.handle('file:openFiles', async (_event, options?: { filters?: { name: string; extensions: string[] }[] }) => {
+  const result = await dialog.showOpenDialog({
+    filters: options?.filters || [{ name: 'Excel Files', extensions: ['xlsx', 'xls'] }],
+    properties: ['openFile', 'multiSelections'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return [];
+  return Promise.all(
+    result.filePaths.map(async (filePath) => {
+      const data = await readFile(filePath);
+      return { filePath, data: data.buffer };
+    })
+  );
+});
+
 ipcMain.handle('file:save', async (_event, data: ArrayBuffer, options?: { defaultName?: string; filters?: { name: string; extensions: string[] }[] }) => {
   const result = await dialog.showSaveDialog({
     defaultPath: options?.defaultName,

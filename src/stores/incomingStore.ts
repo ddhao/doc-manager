@@ -28,6 +28,8 @@ export interface IncomingDoc {
   reviewer: string | null;
   reply_date: string | null;
   notes: string | null;
+  /** 由工单管理生成的收文，记录来源工单 id */
+  work_order_id?: number | null;
   departments?: DocDepartment[];
   created_at: string;
   updated_at: string;
@@ -101,6 +103,32 @@ async function loadDocDepartments(docIds: number[]): Promise<Map<number, DocDepa
     map.set(row.incoming_doc_id, list);
   }
   return map;
+}
+
+/** 收文状态 → 工单状态；返回 null 表示不改动工单 */
+function mapIncomingStatusToWorkOrder(incomingStatus: string, workOrderStatus: string | null): string | null {
+  if (incomingStatus === 'done') return 'closed';
+  // 已退单/已挂起是人工设置的工单状态，不因收文的普通状态变化被覆盖
+  if (workOrderStatus === 'returned' || workOrderStatus === 'suspended') return null;
+  return 'processing';
+}
+
+/** 收文状态变化时，同步「工单管理」生成的关联工单 */
+async function syncLinkedWorkOrderStatus(docId: number, incomingStatus: string) {
+  const rows = await db.all<{ work_order_id: number | null; status: string | null }>(
+    `SELECT i.work_order_id AS work_order_id, w.status AS status
+     FROM incoming_docs i LEFT JOIN work_orders w ON w.id = i.work_order_id
+     WHERE i.id = ?`,
+    [docId]
+  );
+  const link = rows[0];
+  if (!link || !link.work_order_id) return;
+  const next = mapIncomingStatusToWorkOrder(incomingStatus, link.status);
+  if (!next || next === link.status) return;
+  await db.run("UPDATE work_orders SET status = ?, updated_at = datetime('now') WHERE id = ?", [
+    next,
+    link.work_order_id,
+  ]);
 }
 
 export const useIncomingStore = create<IncomingState>((set, get) => ({
@@ -262,6 +290,8 @@ export const useIncomingStore = create<IncomingState>((set, get) => ({
     set((s) => ({
       docs: s.docs.map((d) => (d.id === id ? { ...d, status } : d)),
     }));
+    // 关联工单同步状态
+    await syncLinkedWorkOrderStatus(id, status);
   },
 
   batchReply: async (ids) => {
@@ -274,6 +304,7 @@ export const useIncomingStore = create<IncomingState>((set, get) => ({
         "UPDATE incoming_docs SET reply_date = ?, status = 'done', updated_at = datetime('now') WHERE id = ?",
         [now, id]
       );
+      await syncLinkedWorkOrderStatus(id, 'done');
     }
     set((s) => ({
       docs: s.docs.map((d) => ids.includes(d.id) ? { ...d, reply_date: now, status: 'done' } : d),

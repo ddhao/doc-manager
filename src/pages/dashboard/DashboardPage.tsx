@@ -82,8 +82,6 @@ export default function DashboardPage() {
   ];
 
   const incomingColumns: ColumnsType<IncomingDoc> = [
-    { title: '呈批编号', dataIndex: 'approval_number', width: 120, render: (v) => v || '-' },
-    { title: '来文单位', dataIndex: 'send_unit_name', width: 130, render: (v) => v || '-' },
     {
       title: '标题',
       dataIndex: 'title',
@@ -107,6 +105,7 @@ export default function DashboardPage() {
         </div>
       ),
     },
+    { title: '来文单位', dataIndex: 'send_unit_name', width: 130, render: (v) => v || '-' },
     {
       title: '转发股室',
       dataIndex: 'departments',

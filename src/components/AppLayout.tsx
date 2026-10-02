@@ -1,31 +1,34 @@
 import { useEffect, useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu, Modal, Tag, List, Badge, Space } from 'antd';
+import { Layout, Menu, Modal, Tag, List, Badge, Space, Select } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
   InboxOutlined,
   BankOutlined,
   TeamOutlined,
-  ContactsOutlined,
-  SettingOutlined,
+  SolutionOutlined,
+  CustomerServiceOutlined,
   CloudServerOutlined,
   FileTextOutlined,
   ClockCircleOutlined,
   BellOutlined,
 } from '@ant-design/icons';
 import { usePeriodicTaskStore, ReminderTask } from '@/stores/periodicTaskStore';
+import { useHandlerStore } from '@/stores/handlerStore';
 
 const { Sider, Content, Header } = Layout;
 
 const pageTitles: Record<string, string> = {
   '/dashboard': '仪表盘',
   '/incoming': '收文管理',
+  '/workorders': '工单管理',
   '/outgoing': '发文管理',
   '/meetings': '会议管理',
   '/units': '单位管理',
   '/departments': '股室管理',
   '/contacts': '通讯录',
+  '/handlers': '经办人管理',
   '/archives': '档案管理',
   '/archives/records': '归档记录',
   '/config': '基本配置',
@@ -40,12 +43,12 @@ const menuItems: MenuProps['items'] = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '仪表盘' },
   { type: 'divider' },
   { key: '/incoming', icon: <InboxOutlined />, label: '收文管理' },
+  { key: '/workorders', icon: <CustomerServiceOutlined />, label: '工单管理' },
   { type: 'divider' },
   { key: '/units', icon: <BankOutlined />, label: '单位管理' },
   { key: '/departments', icon: <TeamOutlined />, label: '股室管理' },
-  { key: '/contacts', icon: <ContactsOutlined />, label: '通讯录' },
+  { key: '/handlers', icon: <SolutionOutlined />, label: '经办人管理' },
   { type: 'divider' },
-  { key: '/config', icon: <SettingOutlined />, label: '基本配置' },
   { key: '/backup', icon: <CloudServerOutlined />, label: '备份管理' },
   { type: 'divider' },
   { key: '/templates', icon: <FileTextOutlined />, label: '模版管理' },
@@ -57,9 +60,12 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [reminderOpen, setReminderOpen] = useState(false);
   const [reminders, setReminders] = useState<ReminderTask[]>([]);
+  const [handlerPickOpen, setHandlerPickOpen] = useState(false);
+  const [pickedHandler, setPickedHandler] = useState<string | undefined>();
   const navigate = useNavigate();
   const location = useLocation();
   const { loadTasks, getReminderTasks } = usePeriodicTaskStore();
+  const { handlers, loadDefaultHandler, setDefaultHandler } = useHandlerStore();
 
   useEffect(() => {
     const checkReminders = async () => {
@@ -71,6 +77,17 @@ export default function AppLayout() {
       }
     };
     checkReminders();
+
+    // 启动时让用户选择本次使用的经办人
+    const pickHandler = async () => {
+      await useHandlerStore.getState().loadHandlers();
+      await loadDefaultHandler();
+      const { handlers: list, defaultHandler } = useHandlerStore.getState();
+      if (list.length === 0) return;
+      setPickedHandler(defaultHandler || list[0].name);
+      setHandlerPickOpen(true);
+    };
+    pickHandler();
   }, []);
 
   const pathParts = location.pathname.split('/');
@@ -130,6 +147,33 @@ export default function AppLayout() {
           <Outlet />
         </Content>
       </Layout>
+
+      <Modal
+        title="选择经办人"
+        open={handlerPickOpen}
+        closable={false}
+        maskClosable={false}
+        okText="确定"
+        cancelText="稍后"
+        onCancel={() => setHandlerPickOpen(false)}
+        onOk={async () => {
+          if (!pickedHandler) return;
+          await setDefaultHandler(pickedHandler);
+          setHandlerPickOpen(false);
+        }}
+        width={420}
+      >
+        <div style={{ color: '#999', fontSize: 12, marginBottom: 12 }}>
+          选择本次使用的经办人，登记收文时会自动填入；下次启动会默认选中该项。
+        </div>
+        <Select
+          style={{ width: '100%' }}
+          value={pickedHandler}
+          onChange={setPickedHandler}
+          placeholder="请选择经办人"
+          options={handlers.map((h) => ({ value: h.name, label: h.name }))}
+        />
+      </Modal>
 
       <Modal
         title={
